@@ -19,6 +19,36 @@
 | 报警 | 有源蜂鸣器 | I/O=PA12 | GPIO 驱动 |
 | (预留) | ESP32 第二主板 | USART1(PA9/PA10) | 数据上传/联网 |
 
+## 系统接线图
+
+> GitHub 原生支持 Mermaid，此处可直接渲染；完整方案（含电源/上拉/搭建清单）见 [board/schematic.md](board/schematic.md)。
+
+```mermaid
+flowchart LR
+    subgraph Sensors["传感器 / 外设"]
+        HR["MAX30102<br/>心率 · 血氧"]
+        IMU["MPU6050<br/>姿态 · 跌倒"]
+        TEMP["DS18B20<br/>体温"]
+        BUZ["蜂鸣器<br/>报警"]
+        LCD["0.96\" OLED<br/>显示"]
+    end
+
+    subgraph MCU["STM32F103C8T6 蓝板"]
+        I2C2["硬件 I2C2"]
+        SWI["软件 I2C"]
+        OW["单总线 1-Wire"]
+        GPIO["GPIO"]
+        POLL["INT 轮询"]
+    end
+
+    HR -- "SCL=PB7 / SDA=PB8" --> SWI
+    HR -- "INT=PB9" --> POLL
+    IMU -- "SCL=PB10 / SDA=PB11" --> I2C2
+    TEMP -- "DQ=PA8" --> OW
+    LCD -- "SCK=PA5 / SDA=PA6" --> SWI
+    BUZ -- "I/O=PA12" --> GPIO
+```
+
 ## 目录结构
 
 ```
