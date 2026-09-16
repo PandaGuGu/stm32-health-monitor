@@ -39,7 +39,7 @@ flowchart LR
         IMU["MPU6050<br/>姿态 · 跌倒"]
         TEMP["DS18B20<br/>体温"]
         BUZ["蜂鸣器<br/>报警"]
-        LCD["0.96\" OLED<br/>显示"]
+        LCD["0.96寸 OLED<br/>显示"]
     end
 
     subgraph MCU["STM32F103C8T6 蓝板"]
