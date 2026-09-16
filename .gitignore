@@ -1,0 +1,26 @@
+# ===== Keil / MDK 构建产物 =====
+firmware/*/OBJ/
+firmware/*/build.log
+firmware/*/USER/*.uvgui.*
+firmware/*/USER/*.uvguix.*
+firmware/*/USER/*.uvoptx
+firmware/*/USER/*.uvopt
+firmware/*/USER/*.uvguix
+firmware/*/USER/*.uvproj.saved_*
+firmware/*/USER/RTE/
+firmware/*/USER/DebugConfig/
+*.axf
+*.hf
+*.crf
+*.d
+*.o
+*.lst
+*.dep
+*.map
+*.plg
+*.htm
+*.sct
+
+# ===== 编译器临时 =====
+*.bak
+*.log
