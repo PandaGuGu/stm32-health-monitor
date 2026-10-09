@@ -100,7 +100,11 @@ void OLED_W_SCL(uint8_t BitValue)
 	GPIO_WriteBit(GPIOA, GPIO_Pin_5, (BitAction)BitValue);
 	
 	/*如果单片机速度过快，可在此添加适量延时，以避免超出I2C通信的最大速度*/
-	//...
+	/*实测本模块在 72MHz 无延时下会丢位导致不亮，此处加约 2us 延时（限制到 ~100kHz）*/
+	{
+		volatile uint32_t k;
+		for (k = 0; k < 40; k ++);
+	}
 }
 
 /**
@@ -117,7 +121,11 @@ void OLED_W_SDA(uint8_t BitValue)
 	GPIO_WriteBit(GPIOA, GPIO_Pin_6, (BitAction)BitValue);
 	
 	/*如果单片机速度过快，可在此添加适量延时，以避免超出I2C通信的最大速度*/
-	//...
+	/*实测本模块在 72MHz 无延时下会丢位导致不亮，此处加约 2us 延时（限制到 ~100kHz）*/
+	{
+		volatile uint32_t k;
+		for (k = 0; k < 40; k ++);
+	}
 }
 
 /**
