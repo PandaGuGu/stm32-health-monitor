@@ -96,7 +96,8 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4        # IIC  原业务固件
 SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  MAX30102 关闭版（已实测跑通）
 ```
 
-Keil 结果：`0 Error(s), 2 Warning(s)`（`main.c` 中 `temp_num`、`str` 未使用，原代码遗留，无功能影响）。
+编译结果：`0 Error(s), 0 Warning(s)`。原先 `main.c` 里未使用的 `temp_num`、`str` 两个变量已删除
+（GCC 缺省目标实测零告警；Keil 侧同一原因，属纯声明清理、无功能影响）。
 
 ## 7. 已知注意点
 
@@ -125,7 +126,7 @@ Keil 结果：`0 Error(s), 2 Warning(s)`（`main.c` 中 `temp_num`、`str` 未�
 - [ ] **清零 CPU 占用**：`MAX30102` 软件 I2C 主循环占满，需评估加入空闲节拍。
 - [ ] **ESP32 第二主板打通**：利用预留 USART1(PA9/PA10)，按 CSV/JSON 格式上行
       `{"bpm":75,"spo2":98,"temp":36.5,"fall":0}`；ESP32 侧负责 WiFi/云上报/App 推送。
-- [ ] **消除编译告警**：清理 `main.c` 中未使用的 `temp_num`、`str`，将 `0 Error, 2 Warning` 收敛到 0 警告。
+- [x] **消除编译告警**：已删除 `main.c` 中未使用的 `temp_num`、`str`，把 `0 Error, 2 Warning` 收敛到 **0 告警**（`make` 缺省目标复验通过）。
 - [ ] **MAX30102 接线复核**：PB7/PB8 实测零电气痕迹，需用万用表通断档验线 + 隔离测试（SCL/SDA 临时挪到 PB10/PB11）判定模块好坏。见 [调试记录](debug/README.md)。
 - [ ] **统一 INT 引脚定义**：消除 `max30102.h`(PB9) 与 `max30102.c`(PB14) 的矛盾，二选一。
 - [x] **配置校验表落地**（部分）：实测确认 OLED 模块可用（PA5/PA6，I2C）、蜂鸣器为**有源**（开机短鸣两声可闻）、MPU6050 板载上拉存在；MAX30102/DS18B20 上拉待补。详见 [调试记录 · 当前状态](debug/README.md#四当前状态)。

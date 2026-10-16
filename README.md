@@ -79,7 +79,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
 产物：`firmware\MAX30102\OBJ\IIC.hex`（首行 `:020000040800F2`，烧录地址 0x0800 0000）。
-编译结果：`0 Error(s), 2 Warning(s)`（原代码遗留的未使用变量，无影响）。
+编译结果：`0 Error(s), 0 Warning(s)`（原 `main.c` 中未使用的 `temp_num`、`str` 已清理）。
 
 ### 方式 B：arm-none-eabi-gcc（无需 Keil 授权）
 

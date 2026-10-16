@@ -60,9 +60,7 @@ int main(void)
 	int i;
 	int32_t n_brightness;
 	float f_temp;
-	u8 temp_num=0;
 	u8 temp[6];
-	u8 str[100];
 	u8 dis_hr=0,dis_spo2=0;
 
 	NVIC_Configuration();
