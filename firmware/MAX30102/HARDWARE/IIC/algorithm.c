@@ -156,7 +156,20 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
             n_peak_interval_sum += (an_dx_peak_locs[k]-an_dx_peak_locs[k -1]);
         n_peak_interval_sum=n_peak_interval_sum/(n_npks-1);
         *pn_heart_rate=(int32_t)(6000/n_peak_interval_sum);// beats per minutes
-        *pch_hr_valid  = 1;
+        /* Physiological plausibility gate (IEC 60601-2-27 adult HR range).
+         * The vendor reference code set hr_valid=1 for ANY pair of peaks, so a
+         * noise-only window - the sensor with no finger on it - was reported as
+         * a valid beat train (measured on this board: valid=1, 300 bpm, on an IR
+         * dark level of 515 LSB). 30..220 bpm is the range a monitor has to
+         * cover; outside it the value is not a pulse and must be withheld.
+         * A zero interval would also divide by zero downstream. */
+        if (n_peak_interval_sum > 0 &&
+            *pn_heart_rate >= 30 && *pn_heart_rate <= 220) {
+            *pch_hr_valid  = 1;
+        } else {
+            *pn_heart_rate = -999;
+            *pch_hr_valid  = 0;
+        }
     }
     else  {
         *pn_heart_rate = -999;
@@ -223,6 +236,9 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
     for (k=0; k< n_exact_ir_valley_locs_count-1; k++){
         n_y_dc_max= -16777216 ; 
         n_x_dc_max= - 16777216; 
+        n_y_dc_max_idx=0;   /* silences -Wmaybe-uninitialized: the loop below
+                               always assigns both, this just makes it provable */
+        n_x_dc_max_idx=0;
         if (an_exact_ir_valley_locs[k+1]-an_exact_ir_valley_locs[k] >10){
             for (i=an_exact_ir_valley_locs[k]; i< an_exact_ir_valley_locs[k+1]; i++){
                 if (an_x[i]> n_x_dc_max) {n_x_dc_max =an_x[i];n_x_dc_max_idx =i; }

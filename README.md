@@ -12,15 +12,12 @@
 
 | 模块 | 器件 | 关键引脚 | 说明 |
 |------|------|----------|------|
-| 心率 / 血氧 | MAX30102 | SCL=PB7, SDA=PB8, INT=PB9 ⁽¹⁾ | 软件 I2C，Maxim 算法，500 点缓冲 |
+| 心率 / 血氧 | MAX30102 | SCL=PB7, SDA=PB8, INT=PB9 | 软件 I2C，Maxim 算法，500 点缓冲 |
 | 体温 | DS18B20 | DQ=PA8 | 单总线，整数度 |
 | 姿态 / 跌倒 | MPU6050 | SCL=PB10, SDA=PB11 | 硬件 I2C2 | 
 | 显示 | 0.96" OLED | SCK=PA5, SDA=PA6 | 中文字库 |
 | 报警 | 有源蜂鸣器 | I/O=PA12 | GPIO 驱动 |
 | (预留) | ESP32 第二主板 | USART1(PA9/PA10) | 数据上传/联网 |
-
-> ⁽¹⁾ 中断脚存在**代码内部不一致**：`max30102.h:6` 的 `MAX30102_INT` 宏读的是 **PB9**，而 `max30102.c:247` 初始化的却是 **PB14**。
-> 当前有效行为是"读 PB9"，故按 PB9 接线；详见 [调试记录 · 已知不一致](docs/debug/README.md#三处已知的代码文档不一致调试中发现)。
 
 ## 系统接线图
 
@@ -89,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```bash
 cd firmware/MAX30102/gcc
 SHELL=/usr/bin/bash mingw32-make.exe -j4        # IIC  原业务固件（含 MAX30102）
-SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  MAX30102 关闭版（已实测跑通）
+SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  业务固件（已实测跑通）
 SHELL=/usr/bin/bash mingw32-make.exe -j4 LIVE=1 # LIVE 实时诊断（每 3 秒全量复扫）
 SHELL=/usr/bin/bash mingw32-make.exe -j4 DIAG=1 # DIAG 一次性诊断
 ```
@@ -100,10 +97,10 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 DIAG=1 # DIAG 一次性诊断
 
 实机调试过程与故障根因分析收录在 [`docs/debug/`](docs/debug/README.md)，含：
 
-- 固件**无超时死等**导致 OLED 黑屏的定位过程（`myiic.c:51`、`ds18b20.c:68`、`main.c:104/141`）；
+- 固件**无超时死等**导致 OLED 黑屏的定位过程（`ds18b20.c:68`）；
 - **RC 电容探针法**判定"这根针上到底插没插线"的原理与实测数据；
 - ST-Link/OpenOCD 链路参数（`adapter speed 20`）与 USB 重枚举恢复手法；
-- 5 份报告 + 一张**故障速查表**（现象 → 根因 → 修复）。
+- 9 份报告 + 一张**故障速查表**（现象 → 根因 → 修复）。
 
 ## 说明
 

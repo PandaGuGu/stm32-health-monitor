@@ -244,8 +244,15 @@ void max30102_init(void)
 	GPIO_InitTypeDef GPIO_InitStructure;
 
  	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB,ENABLE);	
-	GPIO_InitStructure.GPIO_Pin  = GPIO_Pin_14;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+	/* MAX30102_INT is PBin(9) in myiic.h:6, so PB9 is the pin that is
+	 * actually polled.  The original code configured GPIO_Pin_14, which
+	 * left PB9 in its reset state (floating input) while the INT wait
+	 * `while(MAX30102_INT==1)` polled it.  Configure PB9 as input
+	 * pull-up: idle = 1, INT (active low) = 0.  Keep this comment ASCII
+	 * only - this file is GBK-encoded, do not paste 8-bit text here. */
+	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
  	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	
 	IIC_Init();

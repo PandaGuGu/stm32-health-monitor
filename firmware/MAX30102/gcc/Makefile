@@ -51,7 +51,11 @@ MCU   = $(CPU) -mthumb -mfloat-abi=soft
 #   缺省         -> 原业务固件 IIC（USER/main.c，含 MAX30102）
 ifeq ($(APP),1)
 TARGET       = APP
+# 业务固件默认【包含 MAX30102】（心率/血氧全功能）。
+# 如需旧的无 30102 关闭版（例如 30102 模块拔掉时只想跑其它功能）：make APP=1 NOMAX=1
+ifeq ($(NOMAX),1)
 EXTRA_DEFS   = -DNO_MAX30102
+endif
 USER_SOURCES = $(FIRMWARE)/USER/stm32f10x_it.c \
                $(FIRMWARE)/USER/system_stm32f10x.c \
                $(FIRMWARE)/gcc/app/app_main.c
