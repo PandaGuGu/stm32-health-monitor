@@ -12,7 +12,7 @@
 | | GND | GND | |
 | | SCL | PB7 | 软件 I2C 时钟 |
 | | SDA | PB8 | 软件 I2C 数据 |
-| | INT | PB9 | 轮询（非中断）采样就绪 |
+| | INT | PB9 ⁽*⁾ | 轮询（非中断）采样就绪 |
 | **0.96" OLED** | VCC | 3.3V | SSD1306 |
 | | GND | GND | |
 | | SCK | PA5 | 软件 SPI/I2C 时钟 |
@@ -29,6 +29,12 @@
 | | I/O | PA12 | GPIO 高电平驱动 |
 
 > **注意**：`PA12` 同时是 USB_DP。作 GPIO 使用后蓝板 USB 口不再用于 USB 通信（烧录用 SWD/JLINK 即可）。
+
+> ⁽*⁾ **INT 引脚在代码内部不一致**（实机调试发现）：`HARDWARE/IIC/max30102.h:6` 的
+> `#define MAX30102_INT PBin(9)` 读的是 **PB9**；而 `HARDWARE/IIC/max30102.c:247` 用
+> `GPIO_Init(GPIOB, ... GPIO_Pin_14)` 初始化的却是 **PB14**。
+> 当前固件的有效行为是"**读 PB9**"（且 PB9 未被配置为输入），故按 **PB9** 接线。
+> 详见 [`docs/debug/README.md`](../docs/debug/README.md)。
 
 ## 2. 系统原理图（Mermaid）
 
@@ -66,7 +72,7 @@ flowchart LR
 
 ## 4. 硬件搭建前确认清单
 
-- [ ] OLED 是 4 针(I2C) 还是 7 针(SPI)，驱动是否匹配
-- [ ] 蜂鸣器有源/无源
-- [ ] 各模块板载上拉是否存在
+- [x] OLED 是 4 针(I2C) 还是 7 针(SPI)，驱动是否匹配 —— 实测为 I2C 模块，驱动匹配（`DST-015-D`，已加 ~2µs 底层延时后稳定）
+- [x] 蜂鸣器有源/无源 —— 实测为**有源**（PA12 直接驱动，开机短鸣两声可闻）
+- [x] 各模块板载上拉是否存在 —— MPU6050 有；OLED 有；MAX30102/DS18B20 待补（前者未接通、后者用内部 IPU 兜底）
 - [ ] 蓝板晶振（8MHz HSE）与固件 `system_stm32f10x.c` 配置一致（本工程按 72MHz 主频）

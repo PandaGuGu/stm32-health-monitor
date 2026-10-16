@@ -82,18 +82,41 @@ else if (Temp > 32)   // 用户体表温度过高 → 预警
 
 ## 6. 构建
 
+两条并行的构建路径：
+
 ```powershell
+# A. Keil MDK（原始工程，需 Keil 授权）
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-结果：`0 Error(s), 2 Warning(s)`（`main.c` 中 `temp_num`、`str` 未使用，原代码遗留，无功能影响）。
+```bash
+# B. arm-none-eabi-gcc（无需 Keil 授权，见 firmware/MAX30102/gcc/README.md）
+cd firmware/MAX30102/gcc
+SHELL=/usr/bin/bash mingw32-make.exe -j4        # IIC  原业务固件
+SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  MAX30102 关闭版（已实测跑通）
+```
+
+Keil 结果：`0 Error(s), 2 Warning(s)`（`main.c` 中 `temp_num`、`str` 未使用，原代码遗留，无功能影响）。
 
 ## 7. 已知注意点
 
 - `MAX30102` 采用软件 I2C（`PBout(7)/PBout(8)`），对引脚翻转时序要求高，改动时勿直接换硬件 I2C1（PB7/PB8 不是合法 I2C1 组合）。
 - 采样为阻塞轮询，主循环整体占满，实时性有限；如需与 ESP32 同时工作，建议把采样改到中断/定时器节拍。
+- **三处无超时死等**是黑屏/全部功能失效的根因，接线缺失时会永久卡死：
+  | 位置 | 代码 | 触发条件 |
+  |---|---|---|
+  | `HARDWARE/IIC/myiic.c:51` | `while(READ_SDA)` | MAX30102 不应答 ACK（`max30102_init()` 内） |
+  | `USER/main.c:104 / :141` | `while(MAX30102_INT==1);` | INT 脚悬空（FIFO 采集） |
+  | `HARDWARE/DS18B20/ds18b20.c:68-69` | `while(...)` ×2 | DS18B20 不在线（`ds18b20_init()` 内） |
+  `gcc/app/app_main.c`（`make APP=1`）已用编译屏蔽 + 带超时的本地实现规避这三处，详见调试记录。
+- MAX30102 的 INT 脚在代码里自相矛盾（头文件宏读 PB9、`max30102.c:247` 初始化 PB14），详见 [调试记录](debug/README.md)。
+- `myiic.h:19` 的 `SDA_IN()` 配的是输入浮空而非上拉，总线无外部上拉时读 ACK 电平悬空，建议改 `IPU`。
 
-## 8. TODO / 待办
+## 8. 调试记录
+
+实机调试过程、证据链与故障速查表见 **[`docs/debug/`](debug/README.md)**（5 份报告）。
+
+## 9. TODO / 待办
 
 > 按优先级排列；勾选即表示已推进。硬件事项的前提见 [board/schematic.md](../board/schematic.md) 的「搭建前确认清单」。
 
@@ -103,4 +126,6 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 - [ ] **ESP32 第二主板打通**：利用预留 USART1(PA9/PA10)，按 CSV/JSON 格式上行
       `{"bpm":75,"spo2":98,"temp":36.5,"fall":0}`；ESP32 侧负责 WiFi/云上报/App 推送。
 - [ ] **消除编译告警**：清理 `main.c` 中未使用的 `temp_num`、`str`，将 `0 Error, 2 Warning` 收敛到 0 警告。
-- [ ] **配置校验表落地**：实测确认 OLED 接口类型(4针I2C/7针SPI)、蜂鸣器有源/无源、各模块上拉后回填 `board/schematic.md`。
+- [ ] **MAX30102 接线复核**：PB7/PB8 实测零电气痕迹，需用万用表通断档验线 + 隔离测试（SCL/SDA 临时挪到 PB10/PB11）判定模块好坏。见 [调试记录](debug/README.md)。
+- [ ] **统一 INT 引脚定义**：消除 `max30102.h`(PB9) 与 `max30102.c`(PB14) 的矛盾，二选一。
+- [x] **配置校验表落地**（部分）：实测确认 OLED 模块可用（PA5/PA6，I2C）、蜂鸣器为**有源**（开机短鸣两声可闻）、MPU6050 板载上拉存在；MAX30102/DS18B20 上拉待补。详见 [调试记录 · 当前状态](debug/README.md#四当前状态)。
