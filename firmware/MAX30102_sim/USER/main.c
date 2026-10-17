@@ -21,6 +21,8 @@
 #include "OLED.h"
 #include "Buzzer.h"
 #include "stm32f10x_gpio.h"
+#include "stm32f10x_adc.h"
+#include "stm32f10x_rcc.h"
 #include <stdio.h>
 
 #define DQ_PORT   GPIOA
@@ -227,6 +229,38 @@ static u8 ds_start_convert(void)
 	return 1;
 }
 
+/* ---------------- 电位器 RV2 -> PA0(ADC1_IN0) ----------------
+ * 工程里没编 stm32f10x_adc.c，这里直接操作寄存器，省得改 Keil 工程。 */
+static void pot_adc_init(void)
+{
+	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_ADC1EN;
+	GPIOA->CRL &= ~0x0000000Fu;                   /* PA0 = 模拟输入 */
+	RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_ADCPRE) | RCC_CFGR_ADCPRE_DIV6;  /* 12MHz */
+
+	ADC1->CR1 = 0;                                /* 独立模式，不扫描 */
+	ADC1->CR2 = ADC_CR2_ADON;                     /* 上电 */
+	delay_us(20);
+
+	ADC1->CR2 |= ADC_CR2_RSTCAL;
+	while (ADC1->CR2 & ADC_CR2_RSTCAL) {}
+	ADC1->CR2 |= ADC_CR2_CAL;
+	while (ADC1->CR2 & ADC_CR2_CAL) {}
+
+	ADC1->SQR1 = 0;                               /* 1 个转换 */
+	ADC1->SMPR2 = (ADC1->SMPR2 & ~(7u << 0)) | (4u << 0);  /* 通道0：55.5 周期 */
+	ADC1->CR2 |= (7u << 17) | (1u << 20);         /* EXTSEL=SWSTART, EXTTRIG=1 */
+}
+
+static u16 pot_adc_read(void)
+{
+	u32 n = 0;
+	ADC1->SQR3 = 0;                               /* 通道 0 */
+	ADC1->CR2 |= (1u << 22);                      /* SWSTART */
+	while (!(ADC1->SR & ADC_SR_EOC) && n < 20000) n++;
+	if (n >= 20000) return 0;                     /* 超时当没接电位器 */
+	return (u16)ADC1->DR;
+}
+
 /* ---------------- 显示 ---------------- */
 #define F6  OLED_6X8
 
@@ -247,7 +281,9 @@ int main(void)
 {
 	u16 temp_c = 0, temp_raw = 0, bpm = 0;
 	u8  temp_ok = 0, hr_ok = 0, fall = 0, ow_ok = 0;
-	u8  temp_src = 1;
+	u8  temp_src = 1;                       /* 0=DS18B20 1=模拟 2=电位器 */
+	u8  pot_seen = 0;
+	u16 pot_raw = 0;
 	u16 sim_t = 300;
 	u8  sim_dir = 1;
 	u32 last_sim = 0, last_conv = 0, conv_at = 0, fall_cnt = 0;
@@ -286,6 +322,7 @@ int main(void)
 	}
 	hr_exti_init();
 
+	pot_adc_init();
 	ow_ok = ow_sweep();
 	temp_src = ow_ok ? 0 : 1;
 	if (ow_ok) { ds_start_convert(); conv_busy = 1; conv_at = g_ms; }
@@ -363,13 +400,23 @@ int main(void)
 		}
 		else
 		{
-			if ((now - last_sim) >= 1000)
+			/* 先试 RV2 电位器：抽头 -> PA0，15 ~ 45℃ */
+			pot_raw = pot_adc_read();
+			if (pot_raw > 40) pot_seen = 1;      /* 读到有效电压就认这个通道 */
+
+			if (pot_seen)
+			{
+				u16 t = (u16)(15 + (u32)pot_raw * 30 / 4095);
+				if (t != temp_c) { temp_c = t; temp_ok = 1; temp_src = 2; dirty = 1; }
+			}
+			else if ((now - last_sim) >= 1000)
 			{
 				last_sim = now;
 				if (sim_dir) { if (sim_t >= 380) sim_dir = 0; else sim_t += 10; }
 				else         { if (sim_t <= 250) sim_dir = 1; else sim_t -= 10; }
 				temp_c = (u16)(sim_t / 10);      /* 1.0℃ / s，25~38℃ 来回 */
 				temp_ok = 1;
+				temp_src = 1;
 				dirty = 1;
 			}
 		}
@@ -387,7 +434,7 @@ int main(void)
 		{
 			show_num(42,  0, temp_c, 2, temp_ok);
 			OLED_ClearArea(60, 12, 60, 8);
-			OLED_ShowString(60, 12, temp_src ? "SIM " : "DS18", F6);
+			OLED_ShowString(60, 12, temp_src == 0 ? "DS18" : (temp_src == 2 ? "POT " : "SIM "), F6);
 
 			show_num(24, 24, bpm, 3, hr_ok);
 			show_num(36, 36, (u16)(hr_ok ? 97 : 0), 3, hr_ok);
