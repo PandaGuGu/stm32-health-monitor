@@ -4,9 +4,38 @@
 
 **STM32F103C8T6（蓝板）心率 + 血氧 + 体温 + 跌倒检测** · 复用正点原子标准库工程
 
+[![Release](https://img.shields.io/github/v/release/PandaGuGu/stm32-health-monitor?label=release&color=2ea44f)](https://github.com/PandaGuGu/stm32-health-monitor/releases)
+[![Last commit](https://img.shields.io/github/last-commit/PandaGuGu/stm32-health-monitor?color=0969da)](https://github.com/PandaGuGu/stm32-health-monitor/commits/main)
+[![License](https://img.shields.io/github/license/PandaGuGu/stm32-health-monitor?color=yellow)](LICENSE)
+[![Top language](https://img.shields.io/github/languages/top/PandaGuGu/stm32-health-monitor?color=555)](https://github.com/PandaGuGu/stm32-health-monitor)
+[![Repo size](https://img.shields.io/github/repo-size/PandaGuGu/stm32-health-monitor?color=blueviolet)](https://github.com/PandaGuGu/stm32-health-monitor)
+
+![MCU](https://img.shields.io/badge/MCU-STM32F103C8T6-03234B?logo=stmicroelectronics&logoColor=white)
+![Clock](https://img.shields.io/badge/core-72%20MHz-informational)
+![Sim](https://img.shields.io/badge/sim-Proteus%20%7C%20Wokwi-ffb000)
+![Toolchain](https://img.shields.io/badge/toolchain-Keil%20MDK%20V5.06%20%7C%20arm--none--eabi--gcc-555)
+
 </div>
 
 基于 [B站 `BV1mT421a79w`](https://www.bilibili.com/video/BV1mT421a79w)（UP：嵌入式学习君）开源源码二次整理，补全仓库级文档、Mermaid 原理图与一键编译脚本。
+
+## 关于
+
+这是一个**课程小组项目**：用一块 STM32F103C8T6 最小系统板，把心率/血氧（MAX30102）、
+体温（DS18B20）、跌倒（MPU6050）四路监测做进一块板子，OLED 本地显示，异常时蜂鸣器报警。
+
+仓库里同时维护**两套固件**，互不影响：
+
+| | 固件 | 用途 |
+|---|---|---|
+| 🟢 实物 | `firmware/MAX30102/` | 接真传感器，已在实机跑通（心率/血氧/体温/跌倒全部实测） |
+| 🔵 仿真 | `firmware/MAX30102_sim/` | 给 Proteus 用，传感器缺失部分用模拟数据补齐 |
+
+**当前版本 `v0.0.1`**：实物四路监测功能验收通过；Proteus 仿真可完整演示
+（显示 / 跌倒报警 / 蜂鸣器 / 温度跟随电位器），详见 [Release v0.0.1](https://github.com/PandaGuGu/stm32-health-monitor/releases/tag/v0.0.1)。
+
+**范围说明**：这是学习/课设性质的项目，不是医疗器械；MAX30102 的心率/血氧算法来自
+Maxim 官方参考实现，跌倒判定阈值按实测标定，但**未经临床验证**。
 
 ## 功能一览
 

@@ -28,3 +28,5 @@ firmware/*/USER/DebugConfig/
 # ===== Proteus 仿真（只保留工程与仿真固件，排除自动备份/会话状态） =====
 sim/**/Project Backups/
 sim/**/*.workspace
+dist/
+
