@@ -277,9 +277,26 @@ static void show_num(u8 x, u8 y, u16 v, u8 width, u8 ok)
 	OLED_ShowString(x, y, s, F6);
 }
 
+/* 温度按 0.1℃ 单位显示，形如 29.5 */
+static void show_temp(u8 x, u8 y, u16 t10, u8 ok)
+{
+	char b[6];
+	u16 ip, fp;
+	OLED_ClearArea(x, y, 24, 8);
+	if (!ok) { OLED_ShowString(x, y, "--", F6); return; }
+	ip = t10 / 10;
+	fp = t10 % 10;
+	b[0] = (char)('0' + ip / 10);
+	b[1] = (char)('0' + ip % 10);
+	b[2] = '.';
+	b[3] = (char)('0' + fp);
+	b[4] = 0;
+	OLED_ShowString(x, y, b, F6);
+}
+
 int main(void)
 {
-	u16 temp_c = 0, temp_raw = 0, bpm = 0;
+	u16 temp_raw = 0, bpm = 0, temp10 = 0;
 	u8  temp_ok = 0, hr_ok = 0, fall = 0, ow_ok = 0;
 	u8  temp_src = 1;                       /* 0=DS18B20 1=模拟 2=电位器 */
 	u8  pot_seen = 0;
@@ -384,7 +401,7 @@ int main(void)
 					temp_raw = ((u16)b[1] << 8) | b[0];
 					if (temp_raw >= 0xFC90 && temp_raw <= 0x07D0)
 					{
-						temp_c = (u16)(temp_raw >> 4);
+						temp10 = (u16)(((u32)temp_raw * 10) >> 4);
 						temp_ok = 1;
 					}
 					else temp_ok = 0;
@@ -406,15 +423,15 @@ int main(void)
 
 			if (pot_seen)
 			{
-				u16 t = (u16)(15 + (u32)pot_raw * 30 / 4095);
-				if (t != temp_c) { temp_c = t; temp_ok = 1; temp_src = 2; dirty = 1; }
+				u16 t = (u16)(150 + (u32)pot_raw * 300 / 4095);   /* 15.0 ~ 45.0℃ */
+				if (t != temp10) { temp10 = t; temp_ok = 1; temp_src = 2; dirty = 1; }
 			}
 			else if ((now - last_sim) >= 1000)
 			{
 				last_sim = now;
 				if (sim_dir) { if (sim_t >= 380) sim_dir = 0; else sim_t += 10; }
 				else         { if (sim_t <= 250) sim_dir = 1; else sim_t -= 10; }
-				temp_c = (u16)(sim_t / 10);      /* 1.0℃ / s，25~38℃ 来回 */
+				temp10 = sim_t;                  /* 1.0℃ / s，25~38℃ 来回 */
 				temp_ok = 1;
 				temp_src = 1;
 				dirty = 1;
@@ -432,7 +449,7 @@ int main(void)
 		/* ---- 刷新 ---- */
 		if (dirty && (now - last_draw) >= 500)
 		{
-			show_num(42,  0, temp_c, 2, temp_ok);
+			show_temp(42, 0, temp10, temp_ok);
 			OLED_ClearArea(60, 12, 60, 8);
 			OLED_ShowString(60, 12, temp_src == 0 ? "DS18" : (temp_src == 2 ? "POT " : "SIM "), F6);
 
