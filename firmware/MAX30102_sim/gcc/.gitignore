@@ -1,0 +1,8 @@
+# GCC 构建产物不入库
+build/
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
