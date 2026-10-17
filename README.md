@@ -4,11 +4,11 @@
 
 **STM32F103C8T6（蓝板）心率 + 血氧 + 体温 + 跌倒检测** · 复用正点原子标准库工程
 
-[![Release](https://img.shields.io/github/v/release/PandaGuGu/stm32-health-monitor?label=release&color=2ea44f)](https://github.com/PandaGuGu/stm32-health-monitor/releases)
-[![Last commit](https://img.shields.io/github/last-commit/PandaGuGu/stm32-health-monitor?color=0969da)](https://github.com/PandaGuGu/stm32-health-monitor/commits/main)
-[![License](https://img.shields.io/github/license/PandaGuGu/stm32-health-monitor?color=yellow)](LICENSE)
-[![Top language](https://img.shields.io/github/languages/top/PandaGuGu/stm32-health-monitor?color=555)](https://github.com/PandaGuGu/stm32-health-monitor)
-[![Repo size](https://img.shields.io/github/repo-size/PandaGuGu/stm32-health-monitor?color=blueviolet)](https://github.com/PandaGuGu/stm32-health-monitor)
+[![Release](https://img.shields.io/github/v/release/PandaGuGu/stm32-health-monitor?label=release&color=2ea44f&v=2)](https://github.com/PandaGuGu/stm32-health-monitor/releases)
+[![Last commit](https://img.shields.io/github/last-commit/PandaGuGu/stm32-health-monitor?color=0969da&v=2)](https://github.com/PandaGuGu/stm32-health-monitor/commits/main)
+[![License](https://img.shields.io/github/license/PandaGuGu/stm32-health-monitor?color=yellow&v=2)](LICENSE)
+[![Top language](https://img.shields.io/github/languages/top/PandaGuGu/stm32-health-monitor?color=555&v=2)](https://github.com/PandaGuGu/stm32-health-monitor)
+[![Repo size](https://img.shields.io/github/repo-size/PandaGuGu/stm32-health-monitor?color=blueviolet&v=2)](https://github.com/PandaGuGu/stm32-health-monitor)
 
 ![MCU](https://img.shields.io/badge/MCU-STM32F103C8T6-03234B?logo=stmicroelectronics&logoColor=white)
 ![Clock](https://img.shields.io/badge/core-72%20MHz-informational)
