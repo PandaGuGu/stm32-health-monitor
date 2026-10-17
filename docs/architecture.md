@@ -1,6 +1,6 @@
 # 架构设计
 
-> 硬件事项见 [board/schematic.md](../board/schematic.md)。本文件说明固件架构、数据流、跌倒算法与 ESP32 扩展方案。
+> 硬件事项见 [board/schematic.md](../board/schematic.md)；**系统级原理图见 [系统原理图_v1.0.svg](schematic/系统原理图_v1.0.svg)**（引脚分配表见[配套说明](schematic/系统原理图_v1.0.md)）。本文件说明固件架构、数据流、跌倒算法与 ESP32 扩展方案。
 
 ## 1. 技术基线
 

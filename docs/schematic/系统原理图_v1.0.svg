@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 920" font-family="Microsoft YaHei, PingFang SC, Noto Sans SC, sans-serif" width="1400" height="920" role="img">
+  <title>STM32F103C8T6 健康监测仪系统原理图</title>
+  <desc>以 STM32F103C8T6 为控制核心的健康监测仪系统原理图，包含电源域、OLED 显示、MAX30102 心率血氧、MPU6050 六轴、DS18B20 体温、有源蜂鸣器与 SWD 调试接口，标注各路总线类型与引脚分配。</desc>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="#1b1f24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="920" fill="#ffffff"/>
+  <rect x="40" y="40" width="1320" height="760" fill="none" stroke="#1b1f24" stroke-width="1.2"/>
+
+  <text x="700" y="72" text-anchor="middle" font-size="12" fill="#5b6570">健康监测仪 · 系统原理图 / System Block Diagram</text>
+  <line x1="560" y1="82" x2="840" y2="82" stroke="#c3c8ce" stroke-width="0.8"/>
+
+  <rect x="80" y="110" width="150" height="64" rx="6" fill="#faefd9" stroke="#8a682a" stroke-width="1"/>
+  <text x="96" y="134" font-size="12.5" font-weight="500">P1  电源输入</text>
+  <text x="96" y="154" font-size="10.5" fill="#5b6570">USB 5 V / 适配器</text>
+
+  <line x1="236" y1="142" x2="264" y2="142" stroke="#1b1f24" stroke-width="1.6" marker-end="url(#arw)"/>
+
+  <rect x="272" y="110" width="180" height="64" rx="6" fill="#faefd9" stroke="#8a682a" stroke-width="1"/>
+  <text x="288" y="134" font-size="12.5" font-weight="500">U6  AMS1117-3.3</text>
+  <text x="288" y="154" font-size="10.5" fill="#5b6570">LDO · 800 mA · 3.3 V</text>
+
+  <path d="M452 142 H494 V192 H500" fill="none" stroke="#8a682a" stroke-width="1.6"/>
+  <rect x="500" y="180" width="100" height="24" rx="4" fill="#faefd9" stroke="#8a682a" stroke-width="1"/>
+  <text x="550" y="196" text-anchor="middle" font-size="11" font-weight="500" font-family="Consolas, monospace" fill="#6b4f1d">VCC_3V3</text>
+  <text x="614" y="196" font-size="10.5" fill="#5b6570">供 MCU 与全部外设（GND 公共）</text>
+
+  <rect x="515" y="250" width="370" height="410" rx="8" fill="#dde8f5" stroke="#2e5c8a" stroke-width="1.4"/>
+  <text x="535" y="284" font-size="15" font-weight="500">U1  STM32F103C8T6</text>
+  <text x="535" y="306" font-size="11" fill="#5b6570">ARM Cortex-M3 · 72 MHz · 64 KB Flash / 20 KB SRAM</text>
+  <text x="535" y="324" font-size="11" fill="#5b6570">LQFP-48 封装 · 单 3.3 V 供电</text>
+  <line x1="535" y1="340" x2="865" y2="340" stroke="#2e5c8a" stroke-width="0.8" opacity="0.55"/>
+
+  <text x="535" y="360" font-size="10" fill="#5b6570">引脚</text>
+  <text x="585" y="360" font-size="10" fill="#5b6570">功能</text>
+  <text x="715" y="360" font-size="10" fill="#5b6570">引脚</text>
+  <text x="765" y="360" font-size="10" fill="#5b6570">功能</text>
+
+  <text x="535" y="384" font-size="11" font-family="Consolas, monospace">PA13</text>
+  <text x="585" y="384" font-size="11">SWDIO</text>
+  <text x="535" y="416" font-size="11" font-family="Consolas, monospace">PA14</text>
+  <text x="585" y="416" font-size="11">SWCLK</text>
+  <text x="535" y="448" font-size="11" font-family="Consolas, monospace">PA8</text>
+  <text x="585" y="448" font-size="11">DS18B20_DQ</text>
+  <text x="535" y="480" font-size="11" font-family="Consolas, monospace">PA12</text>
+  <text x="585" y="480" font-size="11">BUZZER</text>
+  <text x="535" y="512" font-size="11" font-family="Consolas, monospace">VDD</text>
+  <text x="585" y="512" font-size="11">+3.3 V</text>
+  <text x="535" y="544" font-size="11" font-family="Consolas, monospace">VSS</text>
+  <text x="585" y="544" font-size="11">GND</text>
+
+  <text x="715" y="384" font-size="11" font-family="Consolas, monospace">PA5</text>
+  <text x="765" y="384" font-size="11">OLED_SCL</text>
+  <text x="715" y="416" font-size="11" font-family="Consolas, monospace">PA6</text>
+  <text x="765" y="416" font-size="11">OLED_SDA</text>
+  <text x="715" y="448" font-size="11" font-family="Consolas, monospace">PB7</text>
+  <text x="765" y="448" font-size="11">MAX30102_SCL</text>
+  <text x="715" y="480" font-size="11" font-family="Consolas, monospace">PB8</text>
+  <text x="765" y="480" font-size="11">MAX30102_SDA</text>
+  <text x="715" y="512" font-size="11" font-family="Consolas, monospace">PB9</text>
+  <text x="765" y="512" font-size="11">MAX30102_INT</text>
+  <text x="715" y="544" font-size="11" font-family="Consolas, monospace">PB10</text>
+  <text x="765" y="544" font-size="11">MPU6050_SCL</text>
+  <text x="715" y="576" font-size="11" font-family="Consolas, monospace">PB11</text>
+  <text x="765" y="576" font-size="11">MPU6050_SDA</text>
+
+  <rect x="70" y="330" width="300" height="84" rx="6" fill="#e4e8ec" stroke="#4a545e" stroke-width="1"/>
+  <text x="90" y="356" font-size="13" font-weight="500">J1  SWD 调试接口</text>
+  <text x="90" y="376" font-size="10.5" fill="#5b6570">ST-Link V2 · 20 kHz</text>
+  <text x="90" y="394" font-size="10.5" fill="#5b6570">SWDIO / SWCLK / GND</text>
+
+  <rect x="70" y="454" width="300" height="84" rx="6" fill="#ddf0e8" stroke="#2a6a59" stroke-width="1"/>
+  <text x="90" y="480" font-size="13" font-weight="500">U5  DS18B20</text>
+  <text x="90" y="500" font-size="10.5" fill="#5b6570">数字温度 · ±0.5 ℃</text>
+  <text x="90" y="518" font-size="10.5" fill="#5b6570">4.7 kΩ 上拉至 VCC_3V3</text>
+
+  <rect x="70" y="578" width="300" height="84" rx="6" fill="#e4e8ec" stroke="#4a545e" stroke-width="1"/>
+  <text x="90" y="604" font-size="13" font-weight="500">BZ1  有源蜂鸣器</text>
+  <text x="90" y="624" font-size="10.5" fill="#5b6570">3.3 V · 低电平驱动</text>
+
+  <rect x="1030" y="330" width="300" height="84" rx="6" fill="#ddf0e8" stroke="#2a6a59" stroke-width="1"/>
+  <text x="1050" y="356" font-size="13" font-weight="500">U4  SSD1306 OLED</text>
+  <text x="1050" y="376" font-size="10.5" fill="#5b6570">0.96 英寸 · 128×64 · 单色</text>
+  <text x="1050" y="394" font-size="10.5" fill="#5b6570">I²C 0x3C · 软件模拟</text>
+
+  <rect x="1030" y="454" width="300" height="84" rx="6" fill="#ddf0e8" stroke="#2a6a59" stroke-width="1"/>
+  <text x="1050" y="480" font-size="13" font-weight="500">U2  MAX30102</text>
+  <text x="1050" y="500" font-size="10.5" fill="#5b6570">心率 / 血氧 PPG · I²C 0x57</text>
+  <text x="1050" y="518" font-size="10.5" fill="#5b6570">RED 660 nm · IR 880 nm</text>
+
+  <rect x="1030" y="578" width="300" height="84" rx="6" fill="#ddf0e8" stroke="#2a6a59" stroke-width="1"/>
+  <text x="1050" y="604" font-size="13" font-weight="500">U3  MPU6050</text>
+  <text x="1050" y="624" font-size="10.5" fill="#5b6570">六轴 IMU · I²C 0x68 · ±16 g</text>
+
+  <line x1="370" y1="372" x2="515" y2="372" stroke="#1b1f24" stroke-width="2" stroke-dasharray="10 4 2 4" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="442" y="364" text-anchor="middle" font-size="10.5" fill="#5b6570">SWD</text>
+
+  <line x1="370" y1="496" x2="515" y2="496" stroke="#1b1f24" stroke-width="2.2" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="442" y="488" text-anchor="middle" font-size="10.5" fill="#5b6570">1-Wire</text>
+
+  <line x1="515" y1="620" x2="370" y2="620" stroke="#1b1f24" stroke-width="1.8" marker-end="url(#arw)"/>
+  <text x="442" y="612" text-anchor="middle" font-size="10.5" fill="#5b6570">GPIO</text>
+
+  <line x1="885" y1="372" x2="1030" y2="372" stroke="#1b1f24" stroke-width="2.6" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="957" y="364" text-anchor="middle" font-size="10.5" fill="#5b6570">I²C</text>
+
+  <line x1="885" y1="496" x2="1030" y2="496" stroke="#1b1f24" stroke-width="2.6" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="957" y="488" text-anchor="middle" font-size="10.5" fill="#5b6570">I²C</text>
+
+  <line x1="885" y1="620" x2="1030" y2="620" stroke="#1b1f24" stroke-width="2.6" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="957" y="612" text-anchor="middle" font-size="10.5" fill="#5b6570">I²C2</text>
+
+  <rect x="70" y="690" width="1260" height="56" rx="4" fill="#f7f8f9" stroke="#c3c8ce" stroke-width="0.8"/>
+  <text x="90" y="723" font-size="11" font-weight="500">图例</text>
+
+  <line x1="160" y1="719" x2="220" y2="719" stroke="#1b1f24" stroke-width="2.6" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <text x="232" y="723" font-size="10.5" fill="#5b6570">I²C / 1-Wire 双向总线</text>
+
+  <line x1="460" y1="719" x2="520" y2="719" stroke="#1b1f24" stroke-width="1.8" marker-end="url(#arw)"/>
+  <text x="532" y="723" font-size="10.5" fill="#5b6570">GPIO 单向控制</text>
+
+  <line x1="740" y1="719" x2="800" y2="719" stroke="#1b1f24" stroke-width="2" stroke-dasharray="10 4 2 4"/>
+  <text x="812" y="723" font-size="10.5" fill="#5b6570">SWD 调试链路</text>
+
+  <rect x="1020" y="707" width="46" height="24" rx="4" fill="#faefd9" stroke="#8a682a" stroke-width="1"/>
+  <text x="1043" y="723" text-anchor="middle" font-size="9" font-family="Consolas, monospace" fill="#6b4f1d">3V3</text>
+  <text x="1078" y="723" font-size="10.5" fill="#5b6570">电源网络标签</text>
+
+  <text x="1330" y="786" text-anchor="end" font-size="10" fill="#5b6570">v1.0 · 2026-10-17 · 依据 HARDWARE 层实际配置绘制</text>
+
+  <text x="700" y="850" text-anchor="middle" font-size="14" font-weight="500">图 1  STM32F103C8T6 健康监测仪系统原理图</text>
+  <text x="700" y="874" text-anchor="middle" font-size="11" fill="#5b6570">注：引脚分配依据固件 HARDWARE 层实际配置；软件 I²C 为 GPIO 开漏模拟，I²C2 为 AF 开漏复用，上拉电阻由各模块板载提供。</text>
+  <text x="700" y="894" text-anchor="middle" font-size="11" fill="#5b6570">图上箭头表示数据流向，双向箭头为双向总线；系统实现心率/血氧、体温、体动与跌倒四项监测，OLED 本地显示、蜂鸣器声光报警。</text>
+</svg>

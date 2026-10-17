@@ -55,7 +55,8 @@ flowchart LR
 小组嵌入式/
 ├─ board/           接线与原理图（Mermaid） + 组件清单图组件部分.png
 ├─ docs/            架构说明、算法分析、ESP32 集成方案
-│  └─ debug/        硬件调试报告（实机证据链 + 故障速查表）
+│  ├─ debug/        硬件调试报告（实机证据链 + 故障速查表）
+│  └─ schematic/    系统原理图（SVG 精修版 + 引脚分配表）
 ├─ firmware/
 │  └─ MAX30102/     正点原子标准库 Keil 工程（USER/IIC.uvprojx）
 │     └─ gcc/       独立于 Keil 的 GCC 构建系统 + 诊断固件
@@ -92,6 +93,12 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 DIAG=1 # DIAG 一次性诊断
 ```
 
 详见 [`firmware/MAX30102/gcc/README.md`](firmware/MAX30102/gcc/README.md)。
+
+## 系统原理图
+
+系统级原理图（含电源域、四类外设与 SWD 调试链路）：
+
+[![STM32F103C8T6 健康监测仪系统原理图](docs/schematic/系统原理图_v1.0.svg)](docs/schematic/系统原理图_v1.0.md)
 
 ## 硬件调试记录
 
