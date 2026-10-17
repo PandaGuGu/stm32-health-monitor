@@ -174,7 +174,19 @@ cp firmware/MAX30102_sim/OBJ/IIC.hex sim/proteus/IIC.hex
   `CLOCK_SCALE` 与 72 MHz 不符导致心率偏差 12.5%（`10`）；
 - 10 份报告 + 一张**故障速查表**（现象 → 根因 → 修复）。
 
+## 许可证
+
+本项目自有代码与文档以 **MIT 许可证** 发布，见 [LICENSE](LICENSE)。
+
+⚠️ **MIT 不覆盖第三方组件**：`firmware/` 下的 CORE、STM32F10x_FWLib、SYSTEM、HARDWARE 等目录源自
+正点原子（ALIENTEK）开源工程，其版权头声明"仅供学习使用，未授权禁止用于商业用途"；另有 ST、ARM、
+Maxim、江协科技的代码各自保留原许可。完整的组件清单与使用边界见
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+- 学习 / 课设 / 个人实验：可自由使用、修改、再分发，保留原始版权头与本说明即可
+- 商业用途：需另行取得正点原子及各芯片厂商授权，MIT 许可不能替代
+
 ## 说明
 
-- firmware 内驱动/CORE/FWLib 源自正点原子(ALIENTEK)，其版权头注"仅供学习使用"，本仓库仅作学习整理。
 - 完整接线与原理图见 [board/schematic.md](board/schematic.md)，硬件搭建前请先核对 OLED 接口类型与蜂鸣器是否有源。
+- 本项目**不是医疗器械**，心率/血氧与跌倒判定未经临床验证，不得用于诊断或监护场景。
