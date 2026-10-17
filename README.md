@@ -53,15 +53,20 @@ flowchart LR
 
 ```
 小组嵌入式/
-├─ board/           接线与原理图（Mermaid） + 组件清单图组件部分.png
-├─ docs/            架构说明、算法分析、ESP32 集成方案
-│  ├─ debug/        硬件调试报告（实机证据链 + 故障速查表）
-│  └─ schematic/    系统原理图（SVG 精修版 + 引脚分配表）
+├─ board/              接线与原理图（Mermaid） + 组件清单图组件部分.png
+├─ docs/               架构说明、算法分析、ESP32 集成方案
+│  ├─ debug/           调试报告（实机证据链 + 故障速查表 + 仿真固件说明）
+│  └─ schematic/       系统原理图（SVG 精修版 + 引脚分配表）
 ├─ firmware/
-│  └─ MAX30102/     正点原子标准库 Keil 工程（USER/IIC.uvprojx）
-│     └─ gcc/       独立于 Keil 的 GCC 构建系统 + 诊断固件
+│  ├─ MAX30102/        【实物】正点原子标准库 Keil 工程（USER/IIC.uvprojx）
+│  │  └─ gcc/          独立于 Keil 的 GCC 构建系统 + 诊断固件
+│  └─ MAX30102_sim/    【仿真】Proteus 专用工程，目录结构与上面一致
+│                      └─ USER/main.c 为仿真逻辑（不接传感器）
+├─ sim/
+│  ├─ proteus/         SIT_sim.pdsprj + 被加载的 IIC.hex
+│  └─ wokwi/           Wokwi 网页版方案（diagram.json + sketch.ino）
 ├─ scripts/
-│  └─ build.ps1     一键编译脚本 → firmware/MAX30102/OBJ/IIC.hex
+│  └─ build.ps1        一键编译脚本 → firmware/MAX30102/OBJ/IIC.hex
 ├─ README.md
 └─ LICENSE
 ```
@@ -94,6 +99,35 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 DIAG=1 # DIAG 一次性诊断
 
 详见 [`firmware/MAX30102/gcc/README.md`](firmware/MAX30102/gcc/README.md)。
 
+## 仿真（Proteus）
+
+仿真工程：`sim/proteus/SIT_sim.pdsprj`，加载 `sim/proteus/IIC.hex`。
+
+仿真里的器件与实物**并不等价**：没有 MAX30102 / MPU6050，DS18B20 实际加载的是 `DS1822.MDF`
+模型（单总线命令写不进去，读回恒为 `0xFFFF`），MCU 模型的 `CLOCK_SCALE` 也只有 8（≈64 MHz）。
+所以另立了一份**仿真专用固件**，实物固件一行未改：
+
+| 功能 | 仿真里的数据源 | 引脚 |
+|---|---|---|
+| 温度 | **RV2 电位器**（0~3.3 V 映射 15~45 ℃），ADC 读不到时退回软件模拟 | PA0 / ADC1_IN0 |
+| 心率 | 固件内置节律 66~90 BPM | — |
+| 血氧 | 占位 97 | — |
+| 跌倒 | SW3 开关（20 ms 去抖） | PB1 |
+| 蜂鸣器 | 跌倒时长鸣（低电平驱动） | PA12 |
+
+OLED 第 2 行右侧标数据来源：`POT` = 电位器 / `SIM` = 软件模拟 / `DS18` = 真传感器。
+
+```bash
+# 编译仿真固件
+"C:/Keil_v5/UV4/UV4.exe" -b "$PWD/firmware/MAX30102_sim/USER/IIC.uvprojx" -j0 -o build.log
+
+# 部署给 Proteus（它固定加载这个路径）
+cp firmware/MAX30102_sim/OBJ/IIC.hex sim/proteus/IIC.hex
+```
+
+原理、限制与"换回真传感器"的做法见
+[`docs/debug/10-仿真固件说明.md`](docs/debug/10-仿真固件说明.md)。
+
 ## 系统原理图
 
 系统级原理图（含电源域、四类外设与 SWD 调试链路）：
@@ -107,7 +141,9 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 DIAG=1 # DIAG 一次性诊断
 - 固件**无超时死等**导致 OLED 黑屏的定位过程（`ds18b20.c:68`）；
 - **RC 电容探针法**判定"这根针上到底插没插线"的原理与实测数据；
 - ST-Link/OpenOCD 链路参数（`adapter speed 20`）与 USB 重枚举恢复手法；
-- 9 份报告 + 一张**故障速查表**（现象 → 根因 → 修复）。
+- **Proteus 仿真的坑**：蜂鸣器 `Exclude from Simulation`、DS1822 模型读回 `0xFFFF`、
+  `CLOCK_SCALE` 与 72 MHz 不符导致心率偏差 12.5%（`10`）；
+- 10 份报告 + 一张**故障速查表**（现象 → 根因 → 修复）。
 
 ## 说明
 

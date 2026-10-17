@@ -30,6 +30,11 @@ firmware/MAX30102/
 └─ OBJ/               编译产物（.axt/.hex/.o，已 gitignore）
 ```
 
+**仿真变体**：`firmware/MAX30102_sim/` 是同一套工程的副本（目录结构、驱动、库完全相同），
+只把 `USER/main.c` 换成仿真逻辑，并用它编译出 `sim/proteus/IIC.hex` 供 Proteus 加载。
+两者的差异、数据来源与限制见 [debug/10-仿真固件说明.md](debug/10-仿真固件说明.md)。
+实物固件与仿真固件互不覆盖。
+
 ## 3. 主循环数据流（`USER/main.c`）
 
 ```mermaid
