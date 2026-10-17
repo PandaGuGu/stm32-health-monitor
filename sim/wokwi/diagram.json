@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "小组嵌入式 (STM32 健康监测 · Wokwi 仿真)",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-stm32-bluepill", "id": "mcu", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-ds18b20", "id": "temp1", "top": 20, "left": -180, "attrs": {} },
+    { "type": "wokwi-buzzer", "id": "bz1", "top": -140, "left": -100, "attrs": { "volume": "0.5" } },
+    { "type": "board-ssd1306", "id": "oled1", "top": 120, "left": 260, "attrs": { "i2cAddress": "0x3c" } },
+    { "type": "wokwi-mpu6050", "id": "imu1", "top": -120, "left": 260, "attrs": {} }
+  ],
+  "connections": [
+    [ "temp1:VCC", "mcu:3V3.1", "red", [] ],
+    [ "temp1:GND", "mcu:GND.1", "black", [] ],
+    [ "temp1:DQ", "mcu:A8", "green", [] ],
+    [ "bz1:1", "mcu:GND.2", "black", [] ],
+    [ "bz1:2", "mcu:B1", "green", [] ],
+    [ "mcu:B6", "oled1:SCL", "green", [] ],
+    [ "mcu:B7", "oled1:SDA", "green", [] ],
+    [ "oled1:VCC", "mcu:3V3.2", "red", [] ],
+    [ "oled1:GND", "mcu:GND.3", "black", [] ],
+    [ "mcu:B6", "imu1:SCL", "green", [] ],
+    [ "mcu:B7", "imu1:SDA", "green", [] ],
+    [ "imu1:VCC", "mcu:3V3.1", "red", [] ],
+    [ "imu1:GND", "mcu:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}
