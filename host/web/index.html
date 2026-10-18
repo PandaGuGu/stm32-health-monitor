@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESP32 信息节点 · 上位机</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1117'/%3E%3Crect x='6' y='6' width='20' height='20' rx='3' fill='none' stroke='%2358a6ff' stroke-width='2'/%3E%3Crect x='12' y='12' width='8' height='8' rx='1' fill='%237ee787'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="connDot"></span>
+    <div>
+      <h1>ESP32 信息节点</h1>
+      <p class="sub">上位机 · <span id="srcLabel">未连接</span> · <span id="gwVersion">—</span></p>
+    </div>
+  </div>
+  <div class="topmeta">
+    <div class="kv"><span>状态</span><b id="connState">未连接</b></div>
+    <div class="kv"><span>RSSI</span><b id="topRssi">—</b></div>
+    <div class="kv"><span>运行</span><b id="topUptime">—</b></div>
+    <button class="btn ghost" id="btnExport" title="把当前快照存成 JSON，便于贴进调试报告">导出快照</button>
+  </div>
+</header>
+
+<section class="panel connectbar">
+  <div class="field">
+    <label>数据源</label>
+    <div class="segmented" id="srcSeg">
+      <button data-src="serial" class="seg">串口</button>
+      <button data-src="wifi" class="seg">WiFi</button>
+      <button data-src="mock" class="seg active">模拟器</button>
+    </div>
+  </div>
+
+  <div class="field" id="fieldSerial">
+    <label>串口 <button class="mini" id="btnRefreshPorts" title="重新枚举串口">刷新</button></label>
+    <select id="portSelect"><option value="">（未发现串口）</option></select>
+  </div>
+
+  <div class="field" id="fieldBaud">
+    <label>波特率</label>
+    <select id="baudSelect">
+      <option>115200</option><option>921600</option><option>460800</option><option>230400</option>
+    </select>
+  </div>
+
+  <div class="field hide" id="fieldWifi">
+    <label>设备地址</label>
+    <input id="wifiHost" placeholder="192.168.1.66 或 host:80" value="192.168.1.66">
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="btnConnect">连接</button>
+    <button class="btn ghost" id="btnDisconnect">断开</button>
+  </div>
+</section>
+
+<main class="grid">
+  <article class="card span2">
+    <header><h2>芯片与固件</h2><span class="tag" id="tagReset">—</span></header>
+    <div class="kv-grid" id="cardDevice"></div>
+  </article>
+
+  <article class="card">
+    <header><h2>网络</h2><span class="tag" id="tagNetState">—</span></header>
+    <div class="kv-grid" id="cardNet"></div>
+  </article>
+
+  <article class="card">
+    <header><h2>运行时资源</h2><span class="tag" id="tagHeap">—</span></header>
+    <div class="kv-grid compact" id="cardRuntime"></div>
+    <div class="sparks">
+      <div class="spark"><span>空闲堆</span><canvas id="sparkHeap" height="46"></canvas></div>
+      <div class="spark"><span>芯片温度</span><canvas id="sparkTemp" height="46"></canvas></div>
+      <div class="spark"><span>RSSI</span><canvas id="sparkRssi" height="46"></canvas></div>
+    </div>
+  </article>
+
+  <article class="card span2">
+    <header>
+      <h2>板载 IO</h2>
+      <span class="hint">点击可输出引脚可切换电平；34/35/36/39 仅输入</span>
+    </header>
+    <div class="io-wrap">
+      <div class="pins" id="pinGrid"></div>
+      <div class="adc" id="adcBox"></div>
+    </div>
+  </article>
+
+  <article class="card">
+    <header>
+      <h2>WiFi 扫描</h2>
+      <button class="btn small" id="btnScan">扫描</button>
+    </header>
+    <div class="table-wrap">
+      <table class="scan">
+        <thead><tr><th>SSID</th><th>RSSI</th><th>信道</th><th>加密</th></tr></thead>
+        <tbody id="scanBody"><tr><td colspan="4" class="empty">尚未扫描</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="card span2">
+    <header>
+      <h2>命令台</h2>
+      <span class="hint">下行文本命令：<code>info</code> <code>scan</code> <code>gpio.set 2 1</code> <code>interval 500</code></span>
+    </header>
+    <div class="console-cmd">
+      <input id="cmdInput" placeholder="输入命令后回车，例如 scan">
+      <button class="btn primary small" id="btnSend">发送</button>
+    </div>
+    <pre class="ack" id="ackOut">—</pre>
+  </article>
+
+  <article class="card span3">
+    <header>
+      <h2>原始数据流</h2>
+      <span class="hint" id="lineStats">0 行</span>
+    </header>
+    <pre class="raw" id="rawOut">等待设备数据…</pre>
+  </article>
+</main>
+
+<footer class="foot">
+  <span>ESP32 信息节点 v0.1.0 · 网关 <span id="gwUrl">—</span></span>
+  <span>协议见 docs/esp32/protocol.md</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

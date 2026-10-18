@@ -26,17 +26,37 @@ firmware/MAX30102_sim/             同上（仿真工程为同一套驱动的副
 | MAX30102 心率/血氧算法（`HARDWARE/IIC/algorithm.c`） | Maxim Integrated 参考实现 | Maxim 原始声明 |
 | SSD1306 OLED 驱动与字库 | 江协科技（jiangxiekeji.com） | 原作者声明 |
 
-## 3. 本项目自有部分
+## 3. ESP32 侧（v0.2.0 新增）
+
+本仓库**不包含**下列组件的源码，它们仅作为构建依赖/工具链存在（`firmware/esp32/build/` 已 gitignore）：
+
+| 组件 | 用途 | 许可 |
+|---|---|---|
+| [arduino-esp32](https://github.com/espressif/arduino-esp32) 2.0.17 | ESP32 Arduino 核心（`WiFi` / `WebServer` / `Preferences` 等） | LGPL-2.1 |
+| [ESP-IDF](https://github.com/espressif/esp-idf) v4.4 | arduino-esp32 底层，提供 FreeRTOS / 驱动 | Apache-2.0 |
+| xtensa-esp32-elf-gcc / riscv32-esp-elf-gcc | 交叉编译器（Espressif crosstool-NG 构建） | GPL-3.0（含 GCC Runtime Library Exception） |
+| [esptool](https://github.com/espressif/esptool) 4.5.1 | 烧录/读 Flash | GPL-2.0 |
+| [arduino-cli](https://github.com/arduino/arduino-cli) | 命令行构建工具 | GPL-3.0 |
+
+> 若分发基于本仓库编译出的 ESP32 固件（`.bin`），需按 LGPL-2.1 提供对应核心源码/替换方式；
+> 仅在本仓库内提供源码与构建脚本不触发该义务。
+
+上位机（`host/`）无第三方运行时依赖：网关只用 Python 标准库 + `pyserial`（BSD-3-Clause），
+Web 端纯原生 JS/CSS，Android 端仅用 Android SDK（未引入 AndroidX 或任何第三方库）。
+
+## 4. 本项目自有部分
 
 以下内容由本项目成员编写，适用仓库根目录的 MIT 许可证：
 
 - `firmware/MAX30102_sim/USER/main.c`（仿真专用固件逻辑）
 - `firmware/MAX30102/USER/main.c` 中的业务逻辑与跌倒判定（基于原始工程二次修改）
 - `firmware/MAX30102/gcc/`（GCC 构建系统、`app/`、`diag/`、`tools/`）
+- `firmware/esp32/`（ESP32 信息节点固件，8 个模块）
+- `host/`（网关、Web 面板、Android App）
 - `sim/`（Proteus / Wokwi 仿真工程）
 - `docs/`、`board/`、`README.md`、`CHANGELOG.md`、`scripts/`
 
-## 4. 使用建议
+## 5. 使用建议
 
 - **学习、课设、毕设、个人实验**：可以自由使用、修改、再分发，保留本文件与原始版权头即可。
 - **商业用途**：需先取得正点原子与各芯片厂商的授权；MIT 许可不能替代这些授权。

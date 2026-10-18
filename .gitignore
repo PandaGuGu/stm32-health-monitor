@@ -30,3 +30,19 @@ sim/**/Project Backups/
 sim/**/*.workspace
 dist/
 
+# ===== ESP32 固件（arduino-cli 产物） =====
+firmware/esp32/build/
+
+# ===== 上位机网关（Python） =====
+host/gateway/__pycache__/
+host/gateway/*.pyc
+host/.venv/
+
+# ===== 上位机 Android（Gradle 产物与本地配置） =====
+host/app/build/
+host/app/app/build/
+host/app/.gradle/
+host/app/.idea/
+host/app/local.properties
+*.apk
+

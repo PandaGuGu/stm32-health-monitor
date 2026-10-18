@@ -1,0 +1,4 @@
+// 只依赖 AGP，不引入任何第三方库：断网也能构建
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}

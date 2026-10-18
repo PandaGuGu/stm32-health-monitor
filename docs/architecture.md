@@ -74,7 +74,7 @@ else if (Temp > 32)   // 用户体表温度过高 → 预警
 2. 引入 GZ 角速度与 DMP/归一化方向，判别站立 vs 平躺差异。
 3. 去抖动（连续 N 帧确认）与报警自动复位/提示确认，降低误报。
 
-## 5. ESP32 第二主板集成（预留）
+## 5. ESP32 第二主板集成
 
 - 目前 `USART1(PA9/PA10)` **未占用**，仅启用 `SYSTEM/usart` 底层，便于作为 STM32→ESP32 的数据链路。
 - 建议格式：每周期输出一行 `CSV` 或 `JSON`，例如：
@@ -84,6 +84,21 @@ else if (Temp > 32)   // 用户体表温度过高 → 预警
 ```
 
 - ESP32 侧可负责 WiFi/蓝牙、云平台上报、App 推送；STM32 仅做采集与本地报警。
+
+### 5.1 已落地（v0.2.0）：ESP32 先做"信息节点"
+
+为了不让"串口 + 联网 + 上位机"三件事互相掩盖，ESP32 先独立成一个只采自己状态的信息节点，
+协议与双端上位机先跑通，再回头接 STM32 的 `USART1`：
+
+| 内容 | 位置 |
+|---|---|
+| 固件（Arduino，WROOM-32，零第三方库） | [`firmware/esp32/esp32_info_node/`](../firmware/esp32/esp32_info_node/) |
+| 协议 v1（JSON Lines 上行 / 文本命令下行） | [esp32/protocol.md](esp32/protocol.md) |
+| 架构取舍与接入路径 | [esp32/architecture.md](esp32/architecture.md) |
+| 上位机（网关 + Web + Android） | [`host/`](../host/), [host/README.md](../host/README.md) |
+
+接入 STM32 时的增量很小：ESP32 侧多一路 `UART2(GPIO16/17)` 解析 STM32 的 JSON，
+并入 `telemetry.vitals`；上位机加一张卡片即可，其余链路不动。
 
 ## 6. 构建
 
@@ -116,7 +131,8 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  业务固件（已实测�
 
 ## 8. 调试记录
 
-实机调试过程、证据链与故障速查表见 **[`docs/debug/`](debug/README.md)**（9 份报告）。
+实机调试过程、证据链与故障速查表见 **[`docs/debug/`](debug/README.md)**（10 份报告）。
+ESP32 与上位机的调试记录见 **[`docs/esp32/debug.md`](esp32/debug.md)**（13 条速查表 + 真机命令回归）。
 
 ## 9. TODO / 待办
 
@@ -127,5 +143,7 @@ SHELL=/usr/bin/bash mingw32-make.exe -j4 APP=1  # APP  业务固件（已实测�
 - [ ] **清零 CPU 占用**：`MAX30102` 软件 I2C 主循环占满，需评估加入空闲节拍。
 - [ ] **ESP32 第二主板打通**：利用预留 USART1(PA9/PA10)，按 CSV/JSON 格式上行
       `{"bpm":75,"spo2":98,"temp":36.5,"fall":0}`；ESP32 侧负责 WiFi/云上报/App 推送。
+      → **v0.2.0 已推进一半**：ESP32 信息节点固件 + Web/Android 双端上位机已完成并跑通
+      （[docs/esp32/](esp32/architecture.md)），剩 STM32 `USART1` → ESP32 `UART2` 的对接与真机复验。
 - [x] **消除编译告警**：已删除 `main.c` 中未使用的 `temp_num`、`str`，把 `0 Error, 2 Warning` 收敛到 **0 告警**（`make` 缺省目标复验通过）。
 - [x] **配置校验表落地**（部分）：实测确认 OLED 模块可用（PA5/PA6，I2C）、蜂鸣器为**有源**（开机短鸣两声可闻）、MPU6050 板载上拉存在；MAX30102/DS18B20 上拉待补。详见 [调试记录 · 当前状态](debug/README.md#四当前状态)。
