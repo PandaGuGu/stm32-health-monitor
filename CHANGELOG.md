@@ -101,5 +101,5 @@
   任何"靠时间算"的量都会偏；`Clock Scale` 改 `9 Times` 可消除
 - 本项目为课程/学习性质，**不是医疗器械**，心率/血氧与跌倒阈值未经临床验证
 
-[v0.2.0]: https://github.com/PandaGuGu/stm32-health-monitor/releases/tag/v0.2.0
+[v0.2.0]: https://github.com/PandaGuGu/stm32-health-monitor/compare/v0.0.1...main
 [v0.0.1]: https://github.com/PandaGuGu/stm32-health-monitor/releases/tag/v0.0.1
