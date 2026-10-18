@@ -41,7 +41,7 @@ OLED 本地显示，异常蜂鸣器报警。维护两套固件：
 | 🟠 固件 | `firmware/esp32/` | 芯片/网络/运行时/IO 四类信息，JSON Lines 上行、文本命令下行 |
 | 🟣 上位机 | `host/` | Python 网关（串口/WiFi/模拟器三源）+ Web 单页 + Android 原生 App |
 
-**当前版本 `v0.2.0`**：ESP32 信息节点与双端上位机已完成，**真机（ESP32-D0WD-V3）串口链路与 17 条命令全部实测通过**。
+**当前版本 `v0.2.0`**：ESP32 信息节点与双端上位机已完成，**真机（ESP32-D0WD-V3）串口链路与 21 条命令实测通过，STM32 生理数据链路已打通（协议+解析+双端展示）**。
 版本变更见 [CHANGELOG.md](CHANGELOG.md#v020---2026-10-18)。
 
 **范围说明**：这是学习/课设性质的项目，不是医疗器械；MAX30102 的心率/血氧算法来自
@@ -96,10 +96,11 @@ STM32 四路监测稳定后，下一步是按 `docs/architecture.md §5` 接 ESP
 
 | 部分 | 位置 | 说明 |
 |---|---|---|
-| ESP32 固件 | `firmware/esp32/esp32_info_node/` | Arduino 框架、WROOM-32、**零第三方库**；上行 JSON Lines / 下行文本命令；串口 + WiFi HTTP 双通路；编译 61% Flash、0 告警 |
+| ESP32 固件 | `firmware/esp32/esp32_info_node/` | Arduino 框架、WROOM-32、**零第三方库**；上行 JSON Lines / 下行文本命令；串口 + WiFi HTTP 双通路；编译 62% Flash、0 告警 |
 | 上位机网关 | `host/gateway/server.py` | Python（标准库 + pyserial）；串口 / WiFi / **内置模拟器** 三选一；REST + SSE；串口自动重连 |
-| Web 面板 | `host/web/` | 无构建单页：四类信息卡片、三条 Canvas 曲线、WiFi 扫描表、命令台（带 ack）、原始 JSON 流 |
+| Web 面板 | `host/web/` | 无构建单页：四类信息卡片 + 生理数据、四条 Canvas 曲线、WiFi 扫描表、命令台（带 ack）、原始 JSON 流 |
 | Android App | `host/app/` | Java 原生、无第三方依赖（APK 30 KB），1 Hz 轮询网关；已在 MuMu 模拟器实测 |
+| STM32 替身 | `host/tools/stm32_sim.py` | 没有 STM32 时喂生理数据：可走网关注入，也可走真串口 |
 
 ```mermaid
 flowchart LR
@@ -110,7 +111,7 @@ flowchart LR
     APP["Android App"]
     MOCK["内置模拟器"]
 
-    STM32 -. "USART1（待接）" .-> ESP32
+    STM32 -- "USART1 → UART2 115200（帧已实现）" --> ESP32
     ESP32 -- "USB 串口 · JSON Lines" --> GW
     ESP32 -. "WiFi /api/*" .-> GW
     MOCK -. "无硬件时同构替身" .-> GW
@@ -123,7 +124,7 @@ flowchart LR
 ![Android 端（MuMu 横屏双列）](docs/esp32/app-mumu-1.png)
 
 已在真机 **ESP32-D0WD-V3**（4 MB Flash / MAC `20:50:0D:33:DA:D8`）上跑通：烧录前整片备份、上电 500 ms 出首帧、
-17 条命令全通、`scan` 扫到真实 AP、`reboot` 后 `reset=sw` 且网关无感；Web 与 App 读到同一份真机数据。
+21 条命令全通（含 4 条 vitals）、`scan` 扫到真实 AP、`reboot` 后 `reset=sw` 且网关无感；Web 与 App 读到同一份真机数据。
 细节见 [docs/esp32/debug.md](docs/esp32/debug.md) 第 3 节。
 
 **没有 ESP32 也能先跑** —— 内置模拟器与真机同构，界面代码不含任何 mock 分支：
@@ -158,10 +159,11 @@ python host/gateway/server.py --source serial --serial COM3
 │  │  └─ gcc/          独立于 Keil 的 GCC 构建系统 + 诊断固件
 │  ├─ MAX30102_sim/    【仿真】Proteus 专用工程，目录结构与上面一致
 │  └─ esp32/           【新】ESP32 信息节点固件（Arduino，esp32_info_node/）
-├─ host/               【新】上位机：gateway（Python）+ web（单页）+ app（Android）
+├─ host/               【新】上位机：gateway（Python）+ web（单页）+ app（Android）+ tools
 │  ├─ gateway/         三数据源（串口/WiFi/模拟器）+ REST + SSE
 │  ├─ web/             无构建 Web 面板
-│  └─ app/             Java 原生 App（零第三方依赖）
+│  ├─ app/             Java 原生 App（零第三方依赖）
+│  └─ tools/           stm32_sim.py：没有 STM32 时喂生理数据
 ├─ sim/
 │  ├─ proteus/         SIT_sim.pdsprj + 被加载的 IIC.hex
 │  └─ wokwi/           Wokwi 网页版方案（diagram.json + sketch.ino）

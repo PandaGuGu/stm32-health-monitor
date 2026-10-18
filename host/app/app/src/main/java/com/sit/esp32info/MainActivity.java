@@ -52,8 +52,9 @@ public class MainActivity extends Activity {
     private TextView segSerial, segWifi, segMock;
     private EditText etGateway, etHost, etCmd;
     private LinearLayout wifiGroup;
-    private Ui.KvGrid gDev, gNet, gRt;
-    private SparkView spHeap, spTemp, spRssi;
+    private Ui.KvGrid gDev, gNet, gRt, gVit;
+    private SparkView spHeap, spTemp, spRssi, spBpm;
+    private TextView tvVitTag;
     private LinearLayout pinBox, adcBox, scanBox;
     private String lastScanKey = "";
     private boolean sourceSynced;      // 首次连上网关时，把本地选择切到网关实际在用的源
@@ -83,13 +84,14 @@ public class MainActivity extends Activity {
 
             LinearLayout left = Ui.col(this);
             left.addView(buildConnectCard(), Ui.matchWrap(Ui.dp(this, 12)));
+            left.addView(buildVitalsCard(), Ui.matchWrap(Ui.dp(this, 12)));
             left.addView(buildRuntimeCard(), Ui.matchWrap(Ui.dp(this, 12)));
-            left.addView(buildNetCard(), Ui.matchWrap(0));
+            left.addView(buildScanCard(), Ui.matchWrap(0));
 
             LinearLayout right = Ui.col(this);
             right.addView(buildDeviceCard(), Ui.matchWrap(Ui.dp(this, 12)));
             right.addView(buildIoCard(), Ui.matchWrap(Ui.dp(this, 12)));
-            right.addView(buildScanCard(), Ui.matchWrap(0));
+            right.addView(buildNetCard(), Ui.matchWrap(0));
 
             LinearLayout.LayoutParams lp = Ui.weight1();
             lp.rightMargin = Ui.dp(this, 12);
@@ -101,6 +103,7 @@ public class MainActivity extends Activity {
             root.addView(buildLogCard(), Ui.matchWrap(0));
         } else {
             root.addView(buildConnectCard(), Ui.matchWrap(Ui.dp(this, 12)));
+            root.addView(buildVitalsCard(), Ui.matchWrap(Ui.dp(this, 12)));
             root.addView(buildDeviceCard(), Ui.matchWrap(Ui.dp(this, 12)));
             root.addView(buildNetCard(), Ui.matchWrap(Ui.dp(this, 12)));
             root.addView(buildRuntimeCard(), Ui.matchWrap(Ui.dp(this, 12)));
@@ -332,8 +335,31 @@ public class MainActivity extends Activity {
         return Ui.card(this, "网络", gNet.root, null);
     }
 
-    private View buildRuntimeCard() {
+    /** 生理数据：STM32 → ESP32 UART2 → 网关；没接 STM32 时显示"未接入" */
+    private View buildVitalsCard() {
         LinearLayout body = Ui.col(this);
+
+        gVit = new Ui.KvGrid(this, 2);
+        gVit.add(this, "bpm", "心率");
+        gVit.add(this, "spo2", "血氧");
+        gVit.add(this, "temp", "体温");
+        gVit.add(this, "fall", "跌倒");
+        gVit.add(this, "age", "帧龄");
+        gVit.add(this, "src", "来源 / 帧数");
+        body.addView(gVit.root);
+
+        LinearLayout sparks = Ui.row(this);
+        sparks.setPadding(0, Ui.dp(this, 8), 0, 0);
+        spBpm = addSpark(sparks, "心率趋势", "bpm");
+        body.addView(sparks);
+
+        tvVitTag = Ui.text(this, "未接入", 10.5f, Ui.MUTED, true);
+        tvVitTag.setPadding(Ui.dp(this, 7), Ui.dp(this, 2), Ui.dp(this, 7), Ui.dp(this, 2));
+        tvVitTag.setBackground(Ui.bg(Ui.CARD_2, Ui.LINE, 20, this));
+        return Ui.card(this, "生理数据 · STM32", body, tvVitTag);
+    }
+
+    private View buildRuntimeCard() {        LinearLayout body = Ui.col(this);
 
         gRt = new Ui.KvGrid(this, 3);
         gRt.add(this, "up", "运行时长");
@@ -571,6 +597,9 @@ public class MainActivity extends Activity {
             tvHeapTag.setTextColor(heap >= 150000 ? Ui.OK : heap >= 80000 ? Ui.WARN : Ui.ERR);
         }
 
+        JSONObject vit = s.optJSONObject("vitals");
+        if (vit != null) renderVitals(vit);
+
         JSONArray series = s.optJSONArray("series");
         drawSeries(series);
 
@@ -606,21 +635,61 @@ public class MainActivity extends Activity {
         if (raw != null) renderRaw(raw, s.optJSONObject("stats"));
     }
 
+    private void renderVitals(JSONObject v) {
+        boolean ok = v.optBoolean("ok");
+        String src = v.optString("src", "");
+        int frames = v.optInt("frames", 0);
+
+        if (!ok) {
+            tvVitTag.setText(frames > 0 ? "已过期" : "未接入");
+            tvVitTag.setTextColor(Ui.DIM);
+            tvVitTag.setBackground(Ui.bg(Ui.CARD_2, Ui.LINE, 20, this));
+            gVit.put("bpm", "—", Ui.DIM);
+            gVit.put("spo2", "—", Ui.DIM);
+            gVit.put("temp", "—", Ui.DIM);
+            gVit.put("fall", "—", Ui.DIM);
+            gVit.put("age", "—", Ui.DIM);
+            gVit.put("src", frames > 0 ? "无有效帧（坏帧 " + v.optInt("bad", 0) + "）" : "等待 STM32", Ui.DIM);
+            return;
+        }
+
+        boolean sim = "sim".equals(src);
+        tvVitTag.setText(sim ? "模拟帧" : "STM32 在线");
+        tvVitTag.setTextColor(sim ? Ui.WARN : Ui.OK);
+        tvVitTag.setBackground(Ui.bg(Ui.CARD_2, sim ? 0x665A3F12 : 0x332A5A34, 20, this));
+
+        int bpm = v.optInt("bpm", 0);
+        int spo2 = v.optInt("spo2", 0);
+        boolean fall = v.optInt("fall", 0) == 1;
+        double temp = v.optDouble("temp", 0);
+        long age = v.optLong("age_ms", 0);
+
+        gVit.put("bpm", bpm + " BPM",
+                bpm >= 60 && bpm <= 100 ? Ui.OK : bpm >= 50 && bpm <= 120 ? Ui.WARN : Ui.ERR);
+        gVit.put("spo2", spo2 + " %", spo2 >= 95 ? Ui.OK : spo2 >= 90 ? Ui.WARN : Ui.ERR);
+        gVit.put("temp", String.format(java.util.Locale.US, "%.1f ℃", temp), Ui.TEXT);
+        gVit.put("fall", fall ? "是" : "否", fall ? Ui.ERR : Ui.OK);
+        gVit.put("age", (age / 1000) + " s 前", age < 3000 ? Ui.MUTED : Ui.WARN);
+        gVit.put("src", src + " · " + frames, Ui.MUTED);
+    }
+
     private void drawSeries(JSONArray series) {
         if (series == null) return;
         int n = series.length();
-        float[] heap = new float[n], temp = new float[n], rssi = new float[n];
-        int hn = 0, tn = 0, rn = 0;
+        float[] heap = new float[n], temp = new float[n], rssi = new float[n], bpm = new float[n];
+        int hn = 0, tn = 0, rn = 0, bn = 0;
         for (int i = 0; i < n; i++) {
             JSONObject p = series.optJSONObject(i);
             if (p == null) continue;
             if (p.has("heap")) heap[hn++] = (float) p.optDouble("heap", 0);
             if (p.has("temp")) temp[tn++] = (float) p.optDouble("temp", 0);
             if (p.has("rssi")) rssi[rn++] = (float) p.optDouble("rssi", 0);
+            if (p.has("bpm")) bpm[bn++] = (float) p.optDouble("bpm", 0);
         }
         spHeap.setData(copyOf(heap, hn), Ui.ACCENT);
         spTemp.setData(copyOf(temp, tn), 0xFFFFA657);
         spRssi.setData(copyOf(rssi, rn), Ui.GREEN);
+        if (spBpm != null) spBpm.setData(copyOf(bpm, bn), 0xFFFF7B72);
     }
 
     private float[] copyOf(float[] a, int n) {

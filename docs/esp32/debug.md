@@ -1,7 +1,7 @@
 # ESP32 信息节点 · 搭建与调试记录
 
 > 记录日期：2026-10-18　环境：Windows 10 · 真机 **ESP32-D0WD-V3**（COM3 / CH340，4 MB Flash）
-> 结论先行：**固件零告警编译通过；真机串口链路与全部 17 条命令实测通过；Web + Android 双端都读到真机数据；
+> 结论先行：**固件零告警编译通过；真机串口链路与全部 21 条命令实测通过；Web + Android 双端都读到真机数据；
 > WiFi 链路（设备侧 HTTP）待配网后复验。** 下表是本次踩到的坑，正文给证据。
 
 ## 故障速查表
@@ -228,7 +228,7 @@ Hash of data verified.
 
 | 命令 | 返回值 | 结论 |
 |---|---|---|
-| `help` | 17 条命令 + `fw` | ✅ |
+| `help` | 21 条命令 + `fw` | ✅ |
 | `ping` | `{"pong":57701}` | ✅ 下行 → 上行往返正常 |
 | `temp` | `{"temp":59.44}` | ✅ |
 | `gpio.set 2 1` → `gpio.get 2` | `{"pin":2,"value":1,"mode":"out"}` → `{"pin":2,"value":1}` | ✅ 板载 LED 亮，状态可回读 |
@@ -254,11 +254,85 @@ STA 模式下通常 1.5–2 s。真机数据见 Web 面板截图。
 - **GPIO 5 / 14 / 15 上电读高**：这几个是 strapping 脚，复位后默认上拉；固件不主动拉低它们是对的（拉低会改启动模式）
 - **芯片温度 60–62 ℃**：AP 常开 + CPU 240 MHz 的常态，比环境高 15–20 ℃；`wifi.off` 后会掉几度
 
-## 4. 当前状态与待办
+## 4. STM32 数据链路的预打通（ESP32 单板阶段）
+
+板子只有 ESP32 一块，但 STM32→ESP32 的格式、解析、上位机展示可以先全部做完 ——
+因为这条链路里只有"电平/波特率"必须见到真板子，其余都能在注入帧上验。
+
+### 4.1 STM32 侧：第一次编译就撞上 `L6218E`
+
+直接按 `docs/architecture.md §5` 的思路 `#include "usart.h"` + `uart_init(115200)` + `printf`，结果：
+
+```
+linking...
+..\OBJ\IIC.axf: Error: L6218E: Undefined symbol uart_init (referred from main.o).
+"..\OBJ\IIC.axf" - 1 Error(s), 0 Warning(s).
+```
+
+`grep` 才发现 Keil 工程里根本没有 `SYSTEM/usart/usart.c`（工程里那个是 SPL 的 `stm32f10x_usart.c`），
+所以既没有 `uart_init()`，也没有 `fputc` 重定向 —— 就算链接过了，`printf` 在 microlib 下也会走半主机调用挂死。
+
+**改成自包含实现**（`main.c` / `gcc/app/app_main.c` 各一份，都是静态函数）：
+
+```c
+static void vitals_uart_init(void);                       /* PA9=TX, PA10=RX, 115200 */
+static void vitals_send(const char *s);                   /* 轮询 TXE/TC 发字节 */
+static char *vitals_u2s(char *p, unsigned v);             /* 无 printf 的整数转字符串 */
+static void vitals_emit(unsigned bpm, unsigned spo2, unsigned temp_raw, unsigned fall);
+```
+
+改完 Keil：
+
+```
+compiling stm32f10x_tim.c...
+linking...
+Program Size: Code=10492 RO-data=3428 RW-data=80 ZI-data=12640
+"..\OBJ\IIC.axf" - 0 Error(s), 0 Warning(s).
+```
+
+### 4.2 ESP32 侧：一个解析器，两条来源
+
+`uart_link.cpp` 里 `Vitals::feedLine()` 是唯一的解析入口：
+
+- 真串口：`Serial2`（GPIO16 RX / GPIO17 TX）按 `\n` 切行后调它
+- 注入：`vitals.sim` 命令拼出同样格式的字符串后也调它
+
+所以"注入能通"就等于"解析这部分逻辑能通"，接上 STM32 后只剩电平和波特率的问题。
+
+容错做了三层：必需字段 `bpm` 缺失 → 丢帧计 `bad`；`bpm` 0–250 / `spo2` 0–100 越界 → 丢帧；
+8 s 无新帧 → `ok=false`（上位机显示"已过期"，不会拿旧值冒充实时）。阈值取 8 s 而不是 5 s，
+因为 STM32 主循环一帧就要 5–6 s（500 点采样 + DS18B20 转换），5 s 会周期性误报。
+
+### 4.3 验证（真机 ESP32 + 注入帧）
+
+```
+→ vitals.sim 78 97 36.5 0
+← {"ok":true,"id":101,"ack":{"t":"ack","cmd":"vitals.sim","data":{"vitals":
+   {"ok":true,"bpm":78,"spo2":97,"temp":36.5,"fall":0,"src":"sim",
+    "age_ms":0,"frames":1,"bad":0,"uart":true}}}}
+```
+
+连上 `host/tools/stm32_sim.py`（1 Hz 随机游走）后，Web/App 的「生理数据 · STM32」卡片实时更新：
+
+| 场景 | 卡片表现 |
+|---|---|
+| 正常（75–80 BPM / 97–99%） | 心率、血氧绿色；跌倒"否"；标签「模拟帧」黄色；心率曲线平滑 |
+| 注入 `118 88 37.9 1` | 心率 118 → 黄、血氧 88 → 红、跌倒"是" → 红；标签仍标「模拟帧」 |
+| 停掉模拟器 5 s 后 | 标签变「已过期」，数值置灰（不沿用旧值） |
+
+`vitals.sim` 与 `vitals.status`、`vitals.echo`（短接 GPIO17→16 可回环自检）都进 `help` 列表。
+
+### 4.4 还没验的
+
+- **真线**：STM32 侧 `USART1` 到 ESP32 `GPIO16` 的实际电平、共地、长线干扰
+- **时序**：STM32 每 ~5 s 一帧（受 MAX30102 采样节流），ESP32 侧 5 s 陈阈值刚好卡在边缘，
+  接线后要确认 `age_ms` 是否长期贴着 5000 —— 如果经常"过期闪一下"，把 `VITALS_STALE_MS` 调到 8000
+
+## 5. 当前状态与待办
 
 **已验证（真机）**
 
-- 串口链路：`hello` 首帧 500 ms、1 Hz 遥测连续、17 条命令全通、`reboot` 后 `reset=sw` 且网关无感
+- 串口链路：`hello` 首帧 500 ms、1 Hz 遥测连续、21 条命令全通、`reboot` 后 `reset=sw` 且网关无感
 - Web/App 双端：都从真机读到型号/MAC/堆/温度/10 个任务、真 AP 列表、真 ack
 - 固件编译：0 error / 0 warning，Flash 61%（807 941 B）
 

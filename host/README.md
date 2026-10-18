@@ -6,7 +6,8 @@ ESP32 信息节点的调试上位机，**Web 端 + Android 端**共用一份 PC 
 host/
 ├─ gateway/       Python 网关：串口 / WiFi / 模拟器 三种数据源，REST + SSE
 ├─ web/           单页面板（无构建、无依赖），由网关直接托管
-└─ app/           Android 原生 App（Java，零第三方库），Gradle 构建
+├─ app/           Android 原生 App（Java，零第三方库），Gradle 构建
+└─ tools/         stm32_sim.py：没有 STM32 时的生理数据模拟器
 ```
 
 ## 1. 为什么是"网关 + 双端"
@@ -77,6 +78,7 @@ python -m venv .venv
 
 - 数据源切换（串口 / WiFi / 模拟器）、串口枚举与一键连接
 - 四类信息卡片：芯片与固件、网络、运行时资源、板载 IO
+- **生理数据卡片**：STM32 的心率 / 血氧 / 体温 / 跌倒 + 帧龄 + 来源（`stm32` 真串口 / `sim` 注入），带心率曲线
 - 三条 Canvas 迷你曲线（空闲堆 / 芯片温度 / RSSI）
 - WiFi 扫描表（信号条 + 信道 + 加密）
 - 命令台（带 ack 回执）与原始 JSON 流
@@ -107,7 +109,24 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 截图：[docs/esp32/app-mumu-1.png](../docs/esp32/app-mumu-1.png)、
 [docs/esp32/app-mumu-2.png](../docs/esp32/app-mumu-2.png)
 
-## 6. 构建注意（踩过的坑）
+## 6. 没有 STM32 时怎么验生理数据
+
+`host/tools/stm32_sim.py` 是 STM32 的替身，两种喂法：
+
+```bash
+# A. 走网关注入（ESP32 不用接任何线，最省事）
+python host/tools/stm32_sim.py
+python host/tools/stm32_sim.py --pattern fall      # 制造跌倒，看红色高亮
+python host/tools/stm32_sim.py --pattern lowspo2   # 低血氧 + 心率偏快
+
+# B. 走真串口：USB-TTL 的 TX 接 ESP32 GPIO16(RX)，GND 共地
+python host/tools/stm32_sim.py --serial COM7
+```
+
+A 模式用的是 ESP32 固件的 `vitals.sim` 命令，与真串口**共用同一个解析函数**，
+所以"注入能通"等于"解析这段逻辑能通"；接上 STM32 后只多验电平/波特率/共地。
+
+## 7. 构建注意（踩过的坑）
 
 - 仓库路径含中文（`小组嵌入式`），AGP 会直接报 "project path contains non-ASCII characters" 并退出。
   `host/app/gradle.properties` 里已加 `android.overridePathCheck=true`，实测 8.7.3 + Gradle 8.14.3 构建正常

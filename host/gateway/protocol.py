@@ -76,6 +76,7 @@ class Snapshot:
         self.runtime: Dict[str, Any] = {}
         self.io: Dict[str, Any] = {"gpio": {}, "adc": {}}
         self.scan: Dict[str, Any] = {}
+        self.vitals: Dict[str, Any] = {}
         self.series: List[Dict[str, Any]] = []
         self.logs: List[Dict[str, Any]] = []
         self.raw: List[Dict[str, Any]] = []
@@ -93,6 +94,7 @@ class Snapshot:
             self.runtime = {}
             self.io = {"gpio": {}, "adc": {}}
             self.scan = {}
+            self.vitals = {}
             self.series = []
             self.logs = []
             self.last_seen = None
@@ -133,9 +135,13 @@ class Snapshot:
             elif t == T_NET:
                 self.net = {k: v for k, v in obj.items() if k not in ("v", "t", "ts")}
             elif t == T_TELEMETRY:
-                rt = {k: v for k, v in obj.items() if k not in ("v", "t", "ts", "gpio", "adc")}
+                rt = {k: v for k, v in obj.items()
+                      if k not in ("v", "t", "ts", "gpio", "adc", "vitals")}
                 self.runtime = rt
                 self.io = {"gpio": obj.get("gpio", {}), "adc": obj.get("adc", {})}
+                if isinstance(obj.get("vitals"), dict):
+                    self.vitals = obj["vitals"]
+                vit = self.vitals if self.vitals.get("ok") else {}
                 self.series.append(
                     {
                         "t": time.time(),
@@ -143,6 +149,8 @@ class Snapshot:
                         "temp": rt.get("temp"),
                         "rssi": rt.get("rssi"),
                         "frag": rt.get("frag"),
+                        "bpm": vit.get("bpm"),
+                        "spo2": vit.get("spo2"),
                     }
                 )
                 if len(self.series) > SERIES_MAX:
@@ -179,6 +187,7 @@ class Snapshot:
                 "runtime": dict(self.runtime),
                 "io": {"gpio": dict(self.io.get("gpio", {})), "adc": dict(self.io.get("adc", {}))},
                 "scan": dict(self.scan),
+                "vitals": dict(self.vitals),
                 "series": list(self.series),
                 "logs": list(self.logs[-60:]),
                 "raw": list(self.raw[-80:]),

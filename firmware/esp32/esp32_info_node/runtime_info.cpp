@@ -9,6 +9,7 @@
 #include "io_probe.h"
 #include "json_out.h"
 #include "net_info.h"
+#include "uart_link.h"
 
 String Rt::fields() {
   uint32_t heap     = ESP.getFreeHeap();
@@ -38,5 +39,6 @@ String Rt::fields() {
 }
 
 void Rt::emitTelemetry() {
-  Json::emit(Json::head("telemetry") + "," + Rt::fields() + "," + Io::fields() + "}");
+  Json::emit(Json::head("telemetry") + "," + Rt::fields() + "," + Io::fields() + "," +
+             Vitals::fields() + "}");
 }

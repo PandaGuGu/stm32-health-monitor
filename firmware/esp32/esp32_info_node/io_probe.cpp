@@ -50,6 +50,8 @@ bool Io::isMonitored(uint8_t pin)  { return pin < 40 && g_monitor[pin]; }
 int Io::read(uint8_t pin) { return digitalRead(pin); }
 
 bool Io::write(uint8_t pin, int value, String &errCode) {
+  // 16/17 已被 vitals UART2 占用，防止误操作把数据链路弄断
+  if (pin == VITALS_RX_PIN || pin == VITALS_TX_PIN) { errCode = "pin_uart"; return false; }
   if (!isOutputPin(pin)) { errCode = "pin_not_output"; return false; }
   if (g_lastMode[pin] != OUTPUT) {
     pinMode(pin, OUTPUT);
@@ -60,6 +62,7 @@ bool Io::write(uint8_t pin, int value, String &errCode) {
 }
 
 bool Io::setMode(uint8_t pin, const String &mode, String &errCode) {
+  if (pin == VITALS_RX_PIN || pin == VITALS_TX_PIN) { errCode = "pin_uart"; return false; }
   if (isAdcPin(pin) && pin >= 34) { errCode = "pin_not_output"; return false; }
   if (!isOutputPin(pin) && !isAdcPin(pin)) { errCode = "pin_reserved"; return false; }
 

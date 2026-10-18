@@ -30,3 +30,10 @@
 
 // ---- 板载 LED ----
 #define LED_PIN          2
+
+// ---- 与 STM32 的数据链路（UART2 ↔ STM32 USART1）----
+// 接线：STM32 PA9(TX) → ESP32 GPIO16(RX)；STM32 PA10(RX) ← ESP32 GPIO17(TX)；共地
+#define VITALS_RX_PIN    16
+#define VITALS_TX_PIN    17
+#define VITALS_BAUD      115200
+#define VITALS_STALE_MS  8000     // STM32 主循环 ~5-6 s 才发一帧，留 2 s 余量

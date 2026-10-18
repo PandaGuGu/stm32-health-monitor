@@ -113,7 +113,7 @@ UI 侧保留最后一次快照（灰显），不会白屏。
 
 ## 5. 与 STM32 的最终拼装
 
-现在固件里 `USART` 完全没占用（`Serial` 是 USB 那一路，GPIO1/3 保留），下一步直接：
+STM32 的 `USART1(PA9/PA10)` 原本完全没占用（`Serial` 是 USB 那一路，GPIO1/3 保留），现在把它接起来：
 
 ```
 STM32 USART1(PA9/PA10) ──115200──▶ ESP32 UART2(GPIO16/17)
@@ -122,8 +122,37 @@ STM32 USART1(PA9/PA10) ──115200──▶ ESP32 UART2(GPIO16/17)
                                     └─ 并入本节点 telemetry：{"vitals":{...}}
 ```
 
-协议不用改：只是 `telemetry` 里多一个 `vitals` 对象，上位机加一栏卡片即可。
-这也是先做"信息节点"的价值——协议和上位机都已经跑通，接 STM32 只剩"多解析一路串口"。
+### 5.1 接线（三根线）
+
+```
+STM32 PA9  (USART1_TX) ──▶ ESP32 GPIO16 (UART2_RX)
+STM32 PA10 (USART1_RX) ◀── ESP32 GPIO17 (UART2_TX，预留回传)
+STM32 GND              ──── ESP32 GND
+```
+
+GPIO16/17 已被 `uart_link` 占用，`gpio.set` / `gpio.mode` 对这两个脚返回 `pin_uart`，
+避免调试时手滑把数据链路打断。
+
+### 5.2 已实现（v0.2.0）
+
+| 位置 | 内容 |
+|---|---|
+| `firmware/MAX30102/USER/main.c` | `vitals_uart_init()` + 每周期 `vitals_emit(bpm, spo2, temp_raw, fall)` |
+| `firmware/MAX30102/gcc/app/app_main.c` | 同上（GCC 变体，逻辑一致） |
+| `firmware/esp32/.../uart_link.*` | UART2 收行 → 极简 JSON 取值 → 合理性校验 → 进 `telemetry.vitals` |
+| 网关 `protocol.py` | `vitals` 从 telemetry 提到 snapshot 顶层，并把 `bpm/spo2` 并入 `series` |
+| Web / App | 「生理数据 · STM32」卡片：心率/血氧/体温/跌倒/帧龄/来源 + 心率曲线 |
+| `host/tools/stm32_sim.py` | 无 STM32 时的替身：可走网关注入，也可走真串口喂 UART2 |
+
+三个实现细节：
+
+1. **STM32 侧不用 `printf`**：Keil 工程没有重定向 `fputc`，microlib 的 `printf` 会走半主机调用直接挂死；
+   改成自己发字节 + 自己转数字（`vitals_send` / `vitals_u2s`），两套构建都安全，也不依赖 `SYSTEM/usart/usart.c`
+   （该文件并未加入 Keil 工程，直接调 `uart_init()` 会 `L6218E: Undefined symbol`）
+2. **坏帧不覆盖旧值**：`bpm` 缺失或 `bpm/spo2` 越界只计 `bad`，保留上一帧；8 s 无新帧才置 `ok=false`
+   （STM32 一帧 5–6 s，阈值留 2 s 余量）
+3. **可以无 STM32 验收**：`vitals.sim` 注入走的是与真串口**同一个** `feedLine()`，所以"解析→网关→双端 UI"
+   这一整段现在就能验完，接上板子只多验"电平、波特率、共地"三件事
 
 ## 6. 目录职责
 
@@ -146,9 +175,10 @@ scripts/build-esp32.ps1           编译/烧录
 | 烧录 | `arduino-cli upload` 814 512 B / 8.1 s，Hash verified；烧前已全片备份 4 194 304 B |
 | 首帧 | 上电 500 ms 内 `net` + `hello` + `telemetry`；`hello` 自报的型号/rev/Flash/MAC 与 `esptool flash_id` 完全一致 |
 | 串口链路 | ✅ 真机：1 Hz 遥测连续、`gpio.set/get`、`adc.get`、`interval`、`scan`、`reboot` 全部返回配对 `ack` |
-| 命令回归 | ✅ 17 条全通；`scan` 扫到 6 个真 AP（含 WPA3 / OPEN / 隐藏 SSID）；`reboot` 后 `reset=sw`、网关 `reconnects=0` |
+| 命令回归 | ✅ 21 条全通（含 4 条 `vitals.*`）；`scan` 扫到 6 个真 AP（含 WPA3 / OPEN / 隐藏 SSID）；`reboot` 后 `reset=sw`、网关 `reconnects=0` |
 | Web 面板 | ✅ 真机数据渲染：型号/MAC/堆/温度/任务数、真 AP 列表、引脚点击 ack，**0 控制台报错** |
 | Android App | ✅ MuMu 上读到同一份真机数据（`20:50:0D:33:DA:D8`），引脚点击后网关侧核实 `gpio.12=1` |
+| **STM32 上行链路** | ✅ **协议与解析已打通**：`vitals.sim` 注入 → telemetry → 网关顶层 → Web/App 卡片；STM32 两侧代码编译通过（Keil 0 error 0 warning）。**真线未接**（见下） |
 | WiFi 链路 | ⏳ 设备侧 `/api/*` 已实现、AP 模式日志 `http api on :80`，**但还没从 PC 连 AP 实打实请求过** |
 | 热插拔 | ⏳ 网关 3 s 重连逻辑未做真机拔插验证 |
 
@@ -166,10 +196,12 @@ scripts/build-esp32.ps1           编译/烧录
 ## 9. TODO
 
 - [x] 协议定版（`protocol.md` v1）与三种数据源同构
-- [x] 固件四类信息采集 + 17 条命令 + 设备侧 HTTP
+- [x] 固件四类信息采集 + 21 条命令 + 设备侧 HTTP
 - [x] Web 面板（连接/卡片/曲线/扫描/命令台/原始流）
 - [x] Android App（双列自适应、引脚可点、命令台）+ MuMu 实测
 - [x] **真机串口链路**：`hello` 首帧、`gpio.set` 生效、`scan`/`reboot` 全部实测通过
+- [x] **STM32 上行链路（协议与解析）**：`vitals.sim` → telemetry → 网关 → Web/App 全通；STM32 侧 `vitals_emit()` 编译通过
+- [ ] **接真 STM32 验线**：PA9→GPIO16、共地，确认 `vitals.src=stm32`、`age_ms` 稳定、丢帧率
 - [ ] **WiFi 链路复验**：`wifi.sta` 配网 → 网关切 `--source wifi`；或 PC 连 `esp32-info-DAD8` 直接打 `/api/*`
 - [ ] 拔插 USB 验证网关 3 s 自动重连
 - [ ] STM32 `USART1` → ESP32 `UART2` 打通，`telemetry` 增加 `vitals`

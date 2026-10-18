@@ -53,6 +53,75 @@ uint8_t Temp;
 
 #define MAX_BRIGHTNESS 255
 
+/* ============================================================
+ * 上行链路：USART1(PA9=TX / PA10=RX) 115200 8N1 → ESP32 UART2
+ *
+ * 不用 printf：本工程没有重定向 fputc，Keil 的 microlib printf 会走
+ * 半主机调用直接挂死。这里自己发字节 + 自己转数字，两个构建都安全。
+ * 帧格式见 docs/esp32/protocol.md §8。
+ * ============================================================ */
+static void vitals_uart_init(void)
+{
+	GPIO_InitTypeDef  gpio;
+	USART_InitTypeDef usart;
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
+
+	gpio.GPIO_Pin   = GPIO_Pin_9;          /* PA9  = USART1_TX */
+	gpio.GPIO_Speed = GPIO_Speed_50MHz;
+	gpio.GPIO_Mode  = GPIO_Mode_AF_PP;
+	GPIO_Init(GPIOA, &gpio);
+
+	gpio.GPIO_Pin   = GPIO_Pin_10;         /* PA10 = USART1_RX */
+	gpio.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+	GPIO_Init(GPIOA, &gpio);
+
+	usart.USART_BaudRate            = 115200;
+	usart.USART_WordLength          = USART_WordLength_8b;
+	usart.USART_StopBits            = USART_StopBits_1;
+	usart.USART_Parity              = USART_Parity_No;
+	usart.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	usart.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;
+	USART_Init(USART1, &usart);
+	USART_Cmd(USART1, ENABLE);
+}
+
+static void vitals_send(const char *s)
+{
+	while (*s) {
+		while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+		USART_SendData(USART1, (uint16_t)(*s++));
+	}
+	while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
+}
+
+static char *vitals_u2s(char *p, unsigned v)
+{
+	char t[6];
+	int  n = 0;
+	if (v == 0u) t[n++] = '0';
+	while (v) { t[n++] = (char)('0' + (v % 10u)); v /= 10u; }
+	while (n) *p++ = t[--n];
+	return p;
+}
+
+/* {"bpm":75,"spo2":98,"temp":36.5,"fall":0,"src":"stm32"} */
+static void vitals_emit(unsigned bpm, unsigned spo2, unsigned temp_raw, unsigned fall)
+{
+	char  num[8];
+	char *p;
+	unsigned t10 = (temp_raw * 10u) / 16u;      /* 0.1℃ 定点 */
+
+	vitals_send("{\"bpm\":");          p = vitals_u2s(num, bpm);    *p = 0; vitals_send(num);
+	vitals_send(",\"spo2\":");         p = vitals_u2s(num, spo2);   *p = 0; vitals_send(num);
+	vitals_send(",\"temp\":");         p = vitals_u2s(num, t10 / 10u); *p = 0; vitals_send(num);
+	vitals_send(".");
+	p = vitals_u2s(num, t10 % 10u);    *p = 0; vitals_send(num);
+	vitals_send(",\"fall\":");         p = vitals_u2s(num, fall);   *p = 0; vitals_send(num);
+	vitals_send(",\"src\":\"stm32\"}\r\n");
+	(void)p;
+}
+
 int main(void)
 { 
 	//variables to calculate the on-board LED brightness that reflects the heartbeats
@@ -62,6 +131,8 @@ int main(void)
 	float f_temp;
 	u8 temp[6];
 	u8 dis_hr=0,dis_spo2=0;
+	u16 temp_raw;            // DS18B20 原始值（0.0625℃/LSB）
+	u8 fall_state=0;         // 0=正常 1=跌倒，随每周期 JSON 上行
 
 	NVIC_Configuration();
 	delay_init();	    	 //延时函数初始化	  
@@ -86,6 +157,7 @@ int main(void)
 	ds18b20_init();
 	//Buzzer
 	Buzzer_init();
+	vitals_uart_init();          /* USART1 → ESP32，见 docs/esp32/protocol.md */
 
 	
 	MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
@@ -178,7 +250,8 @@ int main(void)
 		OLED_ShowNum(47,32,dis_spo2,2,OLED_8X16);
 		
 		//DS18B20
-		Temp = get_tempetature()/16;
+		temp_raw = get_tempetature();        // 只读一次，屏显与上行共用
+		Temp = temp_raw/16;
 		OLED_ShowNum(47,0,Temp,2,OLED_8X16);
 		
 		Last_AX = AX;
@@ -187,18 +260,23 @@ int main(void)
 		MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
 		if (Last_AX - AX >=500 || AX - Last_AX >=500 || Last_AY - AY >=500 || AY - Last_AY >=500) {   //平放后，向上、向下、向左、向右翻超过500报警
 			OLED_ShowChinese(0, 48, "是否跌倒：是");
+			fall_state = 1;
 			// 触发蜂鸣器响
 			Buzzer_on();
 		} else if (Temp > 32) {  
 			OLED_ShowChinese(0, 48, "是否跌倒：否");
+			fall_state = 0;
 			// 触发蜂鸣器响
 			Buzzer_on();
 		} else {
 			OLED_ShowChinese(0, 48, "是否跌倒：否");
+			fall_state = 0;
 			// 关闭蜂鸣器
 			Buzzer_off();
 		}
 		OLED_Update();
+
+		vitals_emit((unsigned)dis_hr, (unsigned)dis_spo2, (unsigned)temp_raw, (unsigned)fall_state);
 	}
 }
 

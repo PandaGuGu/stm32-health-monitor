@@ -11,6 +11,7 @@
 #include "json_out.h"
 #include "net_info.h"
 #include "runtime_info.h"
+#include "uart_link.h"
 
 namespace {
 
@@ -21,6 +22,7 @@ const char *kVerbs[] = {
     "help", "info", "telemetry", "net", "scan", "temp",
     "gpio.get", "gpio.set", "gpio.mode", "adc.get",
     "interval", "wifi.sta", "wifi.ap", "wifi.off",
+    "vitals.status", "vitals.sim", "vitals.uart", "vitals.echo",
     "ping", "echo", "reboot",
 };
 
@@ -246,6 +248,36 @@ String Cmd::execute(const String &rawLine) {
   } else if (verb == "wifi.off") {
     Net::radioOff();
     Json::ack(id, verb, true, "{\"mode\":\"off\"}");
+
+  // ---------------- STM32 数据链路 ----------------
+  } else if (verb == "vitals.status") {
+    Json::ack(id, verb, true, "{" + Vitals::fields() + "}");
+
+  } else if (verb == "vitals.sim") {
+    // vitals.sim <bpm> <spo2> <temp> [fall]
+    String a, rest1, b, rest2, c, rest3;
+    splitFirst(args, a, rest1);
+    splitFirst(rest1, b, rest2);
+    splitFirst(rest2, c, rest3);
+    if (!a.length() || !b.length() || !c.length()) {
+      Json::err(id, verb, "bad_args", "usage: vitals.sim <bpm> <spo2> <temp> [fall]");
+    } else {
+      int temp10 = (int)(c.toFloat() * 10.0f + 0.5f);
+      Vitals::inject(a.toInt(), b.toInt(), temp10, rest3.toInt());
+      Json::ack(id, verb, true, "{" + Vitals::fields() + "}");
+    }
+
+  } else if (verb == "vitals.uart") {
+    if (args == "on") {
+      Vitals::setUart(true);
+    } else if (args == "off") {
+      Vitals::setUart(false);
+    }
+    Json::ack(id, verb, true, "{\"uart\":" + String(Vitals::uartOn() ? "true" : "false") + "}");
+
+  } else if (verb == "vitals.echo") {
+    Vitals::echoSample();
+    Json::ack(id, verb, true, "{\"sent\":true,\"hint\":\"jumper GPIO17-16 to see it parsed\"}");
 
   // ---------------- 其他 ----------------
   } else if (verb == "echo") {

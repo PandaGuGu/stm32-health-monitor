@@ -16,6 +16,7 @@
 #include "json_out.h"
 #include "net_info.h"
 #include "runtime_info.h"
+#include "uart_link.h"
 
 static uint32_t s_lastTelemetry = 0;
 static uint32_t s_firstTelemetry = 0;
@@ -28,6 +29,7 @@ void setup() {
   Io::begin();
   Device::begin();
   Cmd::begin();
+  Vitals::begin();          // UART2：接 STM32
   Net::begin();
   HttpApi::begin();
 
@@ -45,6 +47,7 @@ void setup() {
 void loop() {
   Net::loop();
   Cmd::poll();
+  Vitals::loop();           // 收 STM32 的 vitals 帧
   HttpApi::loop();
 
   uint32_t now = millis();

@@ -56,7 +56,9 @@
  "heap":218340,"heap_min":201556,"heap_max":110580,"frag":4,
  "cpu":240,"tasks":9,"temp":43.25,"rssi":-57,
  "gpio":{"2":0,"4":1,"5":0,"12":0,"13":0},
- "adc":{"34":{"raw":2048,"mv":1560},"35":{"raw":1023,"mv":780}}}
+ "adc":{"34":{"raw":2048,"mv":1560},"35":{"raw":1023,"mv":780}},
+ "vitals":{"ok":true,"bpm":76,"spo2":98,"temp":36.5,"fall":0,
+           "src":"stm32","age_ms":820,"frames":42,"bad":0,"uart":true}}
 ```
 
 - `heap*` 单位字节；`frag` 为最大可分配块占空闲堆的百分比（碎片度，越小越好）。
@@ -67,6 +69,17 @@
 - `gpio` 只包含**监视集合**内的引脚（见 §5），值为 `0`/`1`
 - `adc` 每个引脚是 `{"raw":0-4095,"mv":毫伏}`（`mv` 由 `analogReadMilliVolts()` 校准得出）；
   只包含默认采样引脚与调用过 `adc.get` 的引脚
+- `vitals` 来自 STM32（见 §8），字段含义：
+  | 键 | 说明 |
+  |---|---|
+  | `ok` | 最近 8 s 内有有效帧（`VITALS_STALE_MS = 8000`；STM32 主循环 ~5–6 s 一帧） |
+  | `bpm` / `spo2` | 心率 / 血氧，无效时为 0 |
+  | `temp` | 体温 ℃，0.1 分辨率 |
+  | `fall` | 1 = 跌倒 |
+  | `src` | `stm32`（真串口）/ `sim`（`vitals.sim` 注入）/ `off`（UART 关闭） |
+  | `age_ms` | 距最后一帧的毫秒数；从没收到过则为 `null` |
+  | `frames` / `bad` | 累计有效帧 / 被丢弃的坏帧 |
+  | `uart` | UART2 是否开启 |
 
 ### 3.3 `net`
 
@@ -129,6 +142,10 @@
 | `wifi.sta` | `<ssid> <pass>` | 切 STA 并连网（凭据存 NVS） | `ack` 后 `net` |
 | `wifi.ap` | `<ssid> <pass>` | 切 AP 模式（空密码 = 开放） | `ack` 后 `net` |
 | `wifi.off` | — | 关射频 | `ack` |
+| `vitals.status` | — | 看 STM32 链路状态（同 telemetry 里的 `vitals`） | `ack.data.vitals` |
+| `vitals.sim` | `<bpm> <spo2> <temp> [fall]` | **注入一帧**模拟数据，走与真串口完全相同的解析路径 | `ack.data.vitals` |
+| `vitals.uart` | `on` / `off` | 开关 UART2（关掉可释放 GPIO16/17） | `ack.data.uart` |
+| `vitals.echo` | — | 往 UART2 TX 发一帧样例；**短接 GPIO17→16 可回环自检** | `ack.data.sent` |
 | `ping` | — | 链路探活 | `ack.data.pong` |
 | `echo` | `<text...>` | 回显 | `ack.data.text` |
 | `reboot` | — | 软复位（先回 ack，再重启） | `ack` |
@@ -187,12 +204,44 @@ $ curl "http://192.168.1.66/api/cmd?cmd=gpio.set%202%201&id=13"
   "runtime": { ...telemetry 字段（去掉信封） },
   "io":      { "gpio": {...}, "adc": {...} },
   "scan":    { ...scan 字段 },
-  "series":  [ {"ts":..., "heap":..., "temp":..., "rssi":...} ],
+  "vitals":  { ...telemetry.vitals },
+  "series":  [ {"ts":..., "heap":..., "temp":..., "rssi":..., "bpm":..., "spo2":...} ],
   "last_seen_ms": 1234,
   "stats": {"lines": 320, "errors": 0, "reconnects": 1}
 }
 ```
 
-- `series` 保留最近 **120** 个遥测点，供前端画趋势
+- `series` 保留最近 **120** 个遥测点，供前端画趋势；`vitals.ok` 为真时同时记录 `bpm`/`spo2`
+- `vitals` 从 `telemetry` 里**提到顶层**，Web/App 不必再往下钻
 - 断线时 `connected=false`，但保留最后一次 snapshot（前端展示「最后已知值」并置灰）
 - `source=mock` 时全部字段由内置模拟器生成，接口与真机**完全一致**，用于无硬件开发
+
+## 8. STM32 → ESP32 生理数据帧
+
+STM32 的 `USART1(PA9/PA10)` 每周期发一行（与 §4 的命令**共用同一条 115200 链路**，
+但方向相反；ESP32 在 `UART2` 上收）：
+
+```json
+{"bpm":75,"spo2":98,"temp":36.5,"fall":0,"src":"stm32"}
+```
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `bpm` | int | 心率，**必需**（缺这个键的帧直接丢弃，计入 `bad`） |
+| `spo2` | int | 血氧；越界（>100）整帧丢弃 |
+| `temp` | float | 体温 ℃，允许 `36` 或 `36.5` |
+| `fall` | 0/1 | 跌倒标志 |
+| `src` | string | 可省略；ESP32 以发送端标识（`uart`/`sim`）为准 |
+
+固件侧容错：
+
+- 帧必须以 `\n`（`\r\n` 亦可）结束，最长 190 字节，超长截断
+- `bpm` 0–250、`spo2` 0–100 之外视为坏帧，**不覆盖上一帧有效值**
+- 8 s 没新帧 → `vitals.ok=false`，上位机显示「已过期」而不是继续用旧值冒充实时
+  （STM32 一帧要 5–6 s，阈值定 8 s 才不会周期性误报）
+
+帧的生成位置：`firmware/MAX30102/USER/main.c` 与 `firmware/MAX30102/gcc/app/app_main.c`
+（`vitals_uart_init()` / `vitals_emit()`，自包含实现，不依赖 printf 重定向）。
+
+没有 STM32 时用 `vitals.sim` 命令或 `host/tools/stm32_sim.py` 注入同格式帧，
+解析路径与真串口**完全相同**。

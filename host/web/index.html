@@ -91,6 +91,17 @@
 
   <article class="card">
     <header>
+      <h2>生理数据 · STM32</h2>
+      <span class="tag" id="tagVitals">未接入</span>
+    </header>
+    <div class="kv-grid compact" id="cardVitals"></div>
+    <div class="sparks one">
+      <div class="spark"><span>心率</span><canvas id="sparkBpm" height="46"></canvas></div>
+    </div>
+  </article>
+
+  <article class="card">
+    <header>
       <h2>WiFi 扫描</h2>
       <button class="btn small" id="btnScan">扫描</button>
     </header>
@@ -102,13 +113,13 @@
     </div>
   </article>
 
-  <article class="card span2">
+  <article class="card">
     <header>
       <h2>命令台</h2>
-      <span class="hint">下行文本命令：<code>info</code> <code>scan</code> <code>gpio.set 2 1</code> <code>interval 500</code></span>
+      <span class="hint"><code>help</code> 看全部</span>
     </header>
     <div class="console-cmd">
-      <input id="cmdInput" placeholder="输入命令后回车，例如 scan">
+      <input id="cmdInput" placeholder="scan / gpio.set 2 1 / vitals.sim 78 97 36.5 0">
       <button class="btn primary small" id="btnSend">发送</button>
     </div>
     <pre class="ack" id="ackOut">—</pre>

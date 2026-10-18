@@ -131,6 +131,7 @@ function render(snap) {
   ]);
 
   drawSparks(snap.series || []);
+  renderVitals(snap.vitals || {});
   renderPins(io.gpio || {});
   renderAdc(io.adc || {});
 
@@ -150,6 +151,32 @@ function drawSparks(series) {
   spark('sparkHeap', pick('heap'), '#58a6ff', (v) => bytes(v));
   spark('sparkTemp', pick('temp'), '#ffa657', (v) => v.toFixed(1) + ' ℃');
   spark('sparkRssi', pick('rssi'), '#7ee787', (v) => v + ' dBm');
+  spark('sparkBpm', pick('bpm'), '#ff7b72', (v) => v + ' BPM');
+}
+
+/* 生理数据（来自 STM32，经 ESP32 UART2 转发） */
+const bpmClass = (v) => (v >= 60 && v <= 100 ? 'ok' : v >= 50 && v <= 120 ? 'warn' : 'err');
+const spo2Class = (v) => (v >= 95 ? 'ok' : v >= 90 ? 'warn' : 'err');
+
+function renderVitals(v) {
+  const ok = !!v.ok;
+  const tag = $('tagVitals');
+  if (!ok) {
+    tag.textContent = v.frames ? '已过期' : '未接入';
+    tag.className = 'tag dim';
+  } else {
+    tag.textContent = v.src === 'sim' ? '模拟帧' : 'STM32 在线';
+    tag.className = 'tag ' + (v.src === 'sim' ? 'warn' : 'ok');
+  }
+  const age = typeof v.age_ms === 'number' ? Math.round(v.age_ms / 1000) + ' s 前' : '—';
+  setItems($('cardVitals'), [
+    { k: '心率', v: ok ? v.bpm + ' BPM' : '—', cls: ok ? bpmClass(v.bpm) : 'dim', big: true },
+    { k: '血氧', v: ok ? v.spo2 + ' %' : '—', cls: ok ? spo2Class(v.spo2) : 'dim', big: true },
+    { k: '体温', v: ok ? v.temp + ' ℃' : '—', cls: ok ? '' : 'dim' },
+    { k: '跌倒', v: ok ? (v.fall ? '是' : '否') : '—', cls: ok ? (v.fall ? 'err' : 'ok') : 'dim' },
+    { k: '帧龄', v: age, cls: 'dim' },
+    { k: '来源 / 帧数', v: ok ? `${v.src || '—'} · ${v.frames || 0}` : v.frames ? `无有效帧（坏帧 ${v.bad || 0}）` : '等待 STM32', cls: 'dim' },
+  ]);
 }
 
 function spark(id, data, color, fmt) {
