@@ -23,6 +23,11 @@
   - `vitals.status` / `vitals.sim` / `vitals.uart` / `vitals.echo` 四条命令；坏帧不覆盖旧值，8 s 无帧置 `ok=false`
   - STM32 侧自包含实现（`vitals_uart_init` / `vitals_send` / `vitals_u2s`），不依赖 printf 重定向与 `SYSTEM/usart`
 - **STM32 替身** `host/tools/stm32_sim.py`：无 STM32 时喂帧，支持网关注入与真串口两种模式，含跌倒/低血氧场景
+- **设备自包含服务器（直连模式）**：ESP32 自己提供与 PC 网关**同构**的 `/api/status`（含 60 点序列、
+  扫描缓存 + `ts`）与 `POST /api/cmd`，手机连热点后**不需要电脑**也能看数据、点引脚、跑扫描；
+  代价仅 ~4 KB Flash（825 457 B，62%）
+- **App「直连」档**：数据源多一档，地址填 `http://192.168.4.1`；支持
+  `adb shell am start ... -e url http://192.168.4.1` 直接拉起
 - **上位机网关** `host/gateway/`（Python，标准库 + pyserial）
   - 三种数据源可切：USB 串口 / WiFi 轮询 / **内置模拟器**（无硬件时与真机同构）
   - REST + **SSE** 推送；串口 3 s 自动重连；120 点遥测序列；原始流环形缓冲
@@ -40,6 +45,10 @@
   引脚末行宽度不齐、输入框自动获焦留下手柄 —— 均已修正
 - **STM32 侧链接失败** `L6218E: Undefined symbol uart_init`：Keil 工程未包含 `SYSTEM/usart/usart.c`，
   改用自包含的 USART1 初始化；同时避开 microlib `printf`（无 `fputc` 重定向会走半主机挂死）
+- **扫描把客户端踢下线**：每次扫描临时切 `AP_STA` 再切回，已连的手机/PC 会被断网一次
+  → 改成**开机即 AP_STA**（不来回切模式），实测扫描 3.0 s 且客户端不掉线
+- **App 直连时看不到 AP 列表**：设备侧不缓存扫描结果 → 扫描结果进 `/api/status` 并补 `ts` 字段
+  （App 靠它判断"这是新的一次扫描"）
 - **vitals 陈旧阈值 5 s → 8 s**：STM32 一帧要 5–6 s（500 点采样 + DS18B20 转换），5 s 会周期性误报"已过期"
 - **真机复验后**：`frag`（碎片度）阈值按 ≤8% 判绿是错的（ESP32+WiFi 常态 ~57%）→ 改 65/80；
   `--port` 与串口号混淆 → 加 `--http-port` 别名并在帮助里点明；App 数据源高亮不与网关同步 → 首次对齐
@@ -53,10 +62,13 @@
 - Web 与 App 均读到同一份真机数据（MAC `20:50:0D:33:DA:D8`）
 - **vitals 链路**：`vitals.sim` 注入 → telemetry → 网关顶层 `vitals` → Web/App 卡片（心率/血氧/体温/跌倒/帧龄/来源）；
   注入 `118 88 37.9 1` 时三处告警色正确；STM32 两侧固件编译通过（Keil `0 Error 0 Warning`，`Code=10492`）
+- **WiFi 直连（AP）**：MuMu（经宿主 NAT）与 PC 先后连 `esp32-info-DAD8` → App 直连 `192.168.4.1`，
+  读到真 MAC/SDK、`vitals` 实时；App 点引脚 → 设备 `gpio.4=1`（WiFi 反向控制通）；扫描 8 个 AP / 3.0 s / 客户端不掉线
 - **STM32 侧改动**：`USER/main.c` 与 `gcc/app/app_main.c` 各加一段自包含 USART1 上行，实物 hex 重新生成
 
 ### 已知限制
 
+- **WiFi STA 未验**：AP 直连已实测；`wifi.sta` 连路由器的通路代码就绪但没配过网
 - **STM32 真线未接**：`vitals` 的协议/解析/展示已用注入帧验证，PA9→GPIO16 的实际电平与时序待接线复验
 - **WiFi 链路未实测**：设备侧 `/api/*` 已实现、AP 模式日志 `http api on :80`，但还没从 PC 连 AP 打过接口
 - 热插拔恢复（串口拔掉 → 3 s 重连）未做真机拔插验证

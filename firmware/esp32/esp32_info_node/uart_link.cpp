@@ -147,6 +147,7 @@ void Vitals::echoSample() {
 bool Vitals::uartOn()      { return g_uartOn; }
 int  Vitals::frames()      { return (int)g.frames; }
 int  Vitals::bad()         { return (int)g.bad; }
+int  Vitals::bpm()         { return g.ok ? g.bpm : 0; }
 
 void Vitals::setUart(bool on) {
   g_uartOn = on;

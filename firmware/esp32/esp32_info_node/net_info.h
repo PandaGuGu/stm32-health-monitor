@@ -13,6 +13,7 @@ String fields();                 // "mode":"sta",...
 void   emitNet();
 
 int    scanAndEmit(uint32_t *durMs);   // 返回 AP 数；-1 表示射频关闭
+String lastScan();                     // 最近一次扫描的 JSON（直连模式的 /api/status 用）
 void   emitScan();
 
 bool   connectSta(const String &ssid, const String &pass, String &errCode);

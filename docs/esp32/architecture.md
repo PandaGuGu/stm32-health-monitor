@@ -86,6 +86,22 @@ flowchart LR
 甚至模拟 GPIO 状态、ADC 抖动、AP 丢包和 `reboot` 后的时间归零。
 所以 Web/App 里没有任何 `if (mock)` 分支 —— 插上真板子只换数据源，界面代码一行不改。
 
+### 3.5 直连模式：设备也能当"小网关"
+
+原本的取舍是"设备只吐 JSON，前端由 PC 网关托管"，因为 4 MB Flash 塞前端不划算。
+但**手机没有 PC 时就拿不到数据** —— 所以补了一条直连通道：设备自己提供与网关**同构**的
+`/api/status` + `POST /api/cmd`，App 把地址指向 `http://192.168.4.1` 即可，前端代码零改动。
+
+| | 走 PC 网关 | 直连设备 |
+|---|---|---|
+| 前端 | Web + App | App（Web 仍由 PC 托管） |
+| 数据源 | 串口 / WiFi / 模拟器可切 | 只有设备自己 |
+| 历史序列 | 120 点 | 60 点（设备环形缓冲） |
+| 原始流 | 有（网关缓存） | 无（设备不留日志内存） |
+| 依赖 | PC 必须在 | 只有手机 + 设备 |
+
+代价是设备侧多约 **4 KB** 代码（82 万 → 82.5 万 B，仍只占 62% Flash），换来"没有电脑也能演示"。
+
 ## 4. 数据流
 
 ```mermaid
@@ -179,7 +195,8 @@ scripts/build-esp32.ps1           编译/烧录
 | Web 面板 | ✅ 真机数据渲染：型号/MAC/堆/温度/任务数、真 AP 列表、引脚点击 ack，**0 控制台报错** |
 | Android App | ✅ MuMu 上读到同一份真机数据（`20:50:0D:33:DA:D8`），引脚点击后网关侧核实 `gpio.12=1` |
 | **STM32 上行链路** | ✅ **协议与解析已打通**：`vitals.sim` 注入 → telemetry → 网关顶层 → Web/App 卡片；STM32 两侧代码编译通过（Keil 0 error 0 warning）。**真线未接**（见下） |
-| WiFi 链路 | ⏳ 设备侧 `/api/*` 已实现、AP 模式日志 `http api on :80`，**但还没从 PC 连 AP 实打实请求过** |
+| **WiFi 直连（AP）** | ✅ 真机：手机/MuMu 连 `esp32-info-DAD8`（`12345678`）→ App 直连 `192.168.4.1`，读到真身数据、`vitals` 实时、点引脚设备 `gpio.4=1`、扫描 8 个 AP（3.0 s 且客户端不掉线） |
+| WiFi STA（连路由器） | ⏳ `wifi.sta` 已实现但未配网验证 |
 | 热插拔 | ⏳ 网关 3 s 重连逻辑未做真机拔插验证 |
 
 ## 8. 已知限制
@@ -202,7 +219,8 @@ scripts/build-esp32.ps1           编译/烧录
 - [x] **真机串口链路**：`hello` 首帧、`gpio.set` 生效、`scan`/`reboot` 全部实测通过
 - [x] **STM32 上行链路（协议与解析）**：`vitals.sim` → telemetry → 网关 → Web/App 全通；STM32 侧 `vitals_emit()` 编译通过
 - [ ] **接真 STM32 验线**：PA9→GPIO16、共地，确认 `vitals.src=stm32`、`age_ms` 稳定、丢帧率
-- [ ] **WiFi 链路复验**：`wifi.sta` 配网 → 网关切 `--source wifi`；或 PC 连 `esp32-info-DAD8` 直接打 `/api/*`
+- [x] **WiFi 直连（AP）**：手机/模拟器连热点 → App 直连 `192.168.4.1` 全通（含扫描与反向控制）
+- [ ] **WiFi STA 复验**：`wifi.sta` 配网 → 网关切 `--source wifi --wifi <设备IP>`
 - [ ] 拔插 USB 验证网关 3 s 自动重连
 - [ ] STM32 `USART1` → ESP32 `UART2` 打通，`telemetry` 增加 `vitals`
 - [ ] 历史数据落盘（SQLite/CSV），给课设报告出趋势图

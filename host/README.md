@@ -98,12 +98,18 @@ JAVA_HOME=E:/android-env/jdk17 gradle assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-界面：宽屏（`sw600dp` 以上，例如 MuMu 横屏 1600×900）自动双列，窄屏单列；1 Hz 轮询网关
-`/api/status`，引脚可点、扫描/命令台与 Web 端完全同源。
+界面：宽屏（`sw600dp` 以上，例如 MuMu 横屏 1600×900）自动双列，窄屏单列；引脚可点、扫描/命令台与 Web 端完全同源。
 
-- 默认网关地址：`http://10.0.2.2:8080`（Android 模拟器访问宿主机的固定地址）
-- MuMu 若不通，可在 App 里改成电脑局域网 IP（如 `http://192.168.1.100:8080`），
-  或 `adb reverse tcp:8080 tcp:8080` 后用 `http://127.0.0.1:8080`
+四个数据源档位：
+
+| 档 | 地址 | 场景 |
+|---|---|---|
+| 串口 / WiFi / 模拟器 | `http://10.0.2.2:8080`（MuMu 访问宿主机） | 走 PC 网关 |
+| **直连** | `http://192.168.4.1` | 手机连设备热点 `esp32-info-XXXX` / `12345678`，**不需要电脑** |
+
+- 直连模式下设备 `/api/status` 与网关快照**同构**（`source=device`），App 代码零改动；设备侧 60 点序列、不缓存原始日志
+- 支持启动参数直达：`adb shell am start -n com.sit.esp32info/.MainActivity -e url http://192.168.4.1`
+- MuMu 连设备热点时经宿主 NAT（宿主连上 AP，模拟器即可 ping 通 `192.168.4.1`）
 - 明文 HTTP 已在 `AndroidManifest.xml` 里放开（`usesCleartextTraffic="true"`），仅用于内网调试
 
 截图：[docs/esp32/app-mumu-1.png](../docs/esp32/app-mumu-1.png)、

@@ -176,11 +176,16 @@ ESP32 成功入网或起 AP 后，在 **80** 端口提供：
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/snapshot` | `{"device":{...},"net":{...},"runtime":{...},"io":{...}}`（字段同 §3，无信封） |
+| GET | `/api/status` | **直连模式**：与 PC 网关同构的完整快照（见 §6.1），App 直连时打这个 |
 | GET | `/api/info` | 同 `hello` 载荷 |
 | GET | `/api/telemetry` | 同 `telemetry` 载荷 |
-| GET | `/api/scan` | 同 `scan` 载荷（阻塞 1.5–3 s） |
+| GET | `/api/net` | 同 `net` 载荷 |
+| GET | `/api/scan` | 同 `scan` 载荷（阻塞 1–3 s） |
 | GET | `/api/cmd?cmd=<命令>&id=<id>` | 返回 `{"lines":[{ack 或 err 载荷}, ...]}`；`info` 这类命令会带多行 |
-| GET | `/` | 纯文本状态页（无 Web 资源，便于 `curl` 快速确认） |
+| POST | `/api/cmd` | 请求 `{"cmd":"gpio.set 2 1"}`，返回网关同构的 `{"ok":true,"ack":{...}}` |
+| POST | `/api/connect` | 直连占位：返回 `{"ok":true,"source":"device"}`（App 点"连接"时不会报错） |
+| GET | `/api/ports` | 直连占位：返回 `{"ports":[]}`（设备没有串口可枚举） |
+| GET | `/` | 纯文本状态页（IP / MAC / 堆 / 直连地址 / 接口清单） |
 
 `/api/cmd` 示例：
 
@@ -188,6 +193,29 @@ ESP32 成功入网或起 AP 后，在 **80** 端口提供：
 $ curl "http://192.168.1.66/api/cmd?cmd=gpio.set%202%201&id=13"
 {"lines":[{"v":1,"t":"ack","ts":6100,"id":"13","cmd":"gpio.set","ok":true,"data":{"pin":2,"value":1,"mode":"out"}}]}
 ```
+
+### 6.1 直连模式：设备直接当"小网关"
+
+手机连上 ESP32 的热点（默认 `esp32-info-XXXX` / `12345678`，设备 IP `192.168.4.1`）后，
+**不需要 PC**，App 把地址填 `http://192.168.4.1` 即可。设备侧 `/api/status` 返回与 PC 网关
+`/api/status` **同构**的 snapshot：
+
+```json
+{"source":"device","connected":true,"port":"","host":"192.168.4.1",
+ "device":{...},"net":{...},"runtime":{...},"io":{"gpio":{},"adc":{}},
+ "scan":{"ts":31639,"n":6,"dur_ms":3018,"aps":[...]},
+ "vitals":{...},
+ "series":[{"t":27,"heap":246776,"temp":62.22,"rssi":0,"bpm":0}, ...],
+ "last_seen_age":0,"stats":{"lines":28,"errors":0,"reconnects":0,"acks":0},
+ "proto_mismatch":false,"ts":27}
+```
+
+与走网关的差别：
+
+- `source` 固定为 `device`（App 用它切到"直连"档）
+- `series` 是设备上的环形缓冲（60 点，约 1 分钟），不是网关的 120 点
+- 没有 `raw` 原始流（设备不为每条日志留内存）
+- `stats.acks` 恒为 0（设备不记录 ack 次数），`stats.errors` 是 vitals 坏帧数
 
 > 设备侧**不跑 Web 前端**：Web/App 由 PC 网关统一提供，避免在 4 MB Flash 里塞前端资源，也避免设备 IP 变化导致前端要跟着改地址。
 

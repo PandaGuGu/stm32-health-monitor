@@ -17,9 +17,10 @@
 #define MIN_INTERVAL     100
 #define MAX_INTERVAL     60000
 
-// ---- AP 兜底（NVS 里没有 WiFi 凭据时启用）----
+// ---- AP 兜底（NVS 里没有 WiFi 凭据时启用；也可用 wifi.ap 命令主动切换）----
 #define AP_PREFIX        "esp32-info-"
-#define AP_PASS          "esp32info"   // >= 8 位，否则起不来
+#define AP_PASS          "12345678"   // >= 8 位，否则起不来
+#define AP_CHANNEL       6
 #define HTTP_PORT        80
 
 // ---- NVS ----

@@ -18,6 +18,7 @@ String      g_pass;
 String      g_lastState;   // 上一状态，用于变化上报
 uint32_t    g_lastRetry = 0;
 uint32_t    g_lastNetEmit = 0;
+String      g_lastScan;      // 最近一次扫描结果（"n":..,"dur_ms":..,"aps":[..]）
 
 const char *encName(wifi_auth_mode_t m) {
   switch (m) {
@@ -37,6 +38,7 @@ String stateStr() {
   wifi_mode_t mode = WiFi.getMode();
   if (mode == WIFI_OFF) return "off";
   if (mode == WIFI_AP)  return "ap_listening";
+  if (mode == WIFI_AP_STA && WiFi.status() != WL_CONNECTED) return "ap_listening";
   switch (WiFi.status()) {
     case WL_CONNECTED:  return "connected";
     case WL_IDLE_STATUS:
@@ -130,9 +132,11 @@ bool Net::connectSta(const String &ssid, const String &pass, String &errCode) {
 
 bool Net::startAp(const String &ssid, const String &pass, String &errCode) {
   if (!ssid.length()) { errCode = "bad_args"; return false; }
-  WiFi.mode(WIFI_AP);
-  bool ok = pass.length() >= 8 ? WiFi.softAP(ssid.c_str(), pass.c_str())
-                               : WiFi.softAP(ssid.c_str());
+  // 关键：用 AP_STA 而不是 AP。扫描只能在 station 接口上做，
+  // 若开机是纯 AP，扫描前切 AP_STA 会瞬间断掉已连接的手机/电脑。
+  WiFi.mode(WIFI_AP_STA);
+  bool ok = pass.length() >= 8 ? WiFi.softAP(ssid.c_str(), pass.c_str(), AP_CHANNEL, 0, 4)
+                               : WiFi.softAP(ssid.c_str(), nullptr, AP_CHANNEL, 0, 4);
   if (!ok) { errCode = "wifi_fail"; return false; }
   g_lastRetry = millis();
   emitNet();
@@ -155,7 +159,9 @@ String Net::ip() {
 }
 
 String Net::modeStr() {
-  switch (WiFi.getMode()) {
+  wifi_mode_t m = WiFi.getMode();
+  if (m == WIFI_AP_STA && WiFi.status() != WL_CONNECTED) return "ap";  // 对外仍报 ap
+  switch (m) {
     case WIFI_STA:    return "sta";
     case WIFI_AP:     return "ap";
     case WIFI_AP_STA: return "apsta";
@@ -192,7 +198,8 @@ void Net::emitNet() {
 int Net::scanAndEmit(uint32_t *durMs) {
   wifi_mode_t prev = WiFi.getMode();
   if (prev == WIFI_OFF) { if (durMs) *durMs = 0; return -1; }
-  if (prev == WIFI_AP) WiFi.mode(WIFI_AP_STA);   // 扫描需要 station 接口
+  bool switched = false;
+  if (prev == WIFI_AP) { WiFi.mode(WIFI_AP_STA); switched = true; }  // 纯 AP 才需要临时切
 
   uint32_t t0 = millis();
   int n = WiFi.scanNetworks(false, true);        // 同步、显示隐藏 SSID
@@ -214,11 +221,13 @@ int Net::scanAndEmit(uint32_t *durMs) {
   }
   WiFi.scanDelete();
 
-  Json::emit(Json::head("scan") + ",\"n\":" + String(n) + ",\"dur_ms\":" + String(dur) +
-             ",\"aps\":[" + aps + "]}");
+  g_lastScan = "\"ts\":" + String(millis()) + ",\"n\":" + String(n) + ",\"dur_ms\":" + String(dur) + ",\"aps\":[" + aps + "]";
+  Json::emit(Json::head("scan") + "," + g_lastScan + "}");
 
-  if (prev == WIFI_AP) WiFi.mode(WIFI_AP);
+  if (switched) WiFi.mode(WIFI_AP);
   return n;
 }
 
 void Net::emitScan() { scanAndEmit(nullptr); }
+
+String Net::lastScan() { return g_lastScan.length() ? "{" + g_lastScan + "}" : "{}"; }

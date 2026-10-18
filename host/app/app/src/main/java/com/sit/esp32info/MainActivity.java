@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
 
     private View dot;
     private TextView tvTitleSub, tvState, tvHint, tvHeapTag, tvAck, tvLog, tvLogCount;
-    private TextView segSerial, segWifi, segMock;
+    private TextView segSerial, segWifi, segMock, segDirect;
     private EditText etGateway, etHost, etCmd;
     private LinearLayout wifiGroup;
     private Ui.KvGrid gDev, gNet, gRt, gVit;
@@ -121,6 +121,14 @@ public class MainActivity extends Activity {
         etHost.setText(prefs.getString("host", "192.168.1.66"));
         setSource(prefs.getString("source", "mock"), false);
 
+        // 允许 adb 直接指定：am start -e url http://192.168.4.1（直连设备时很方便）
+        String launchUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
+        if (launchUrl != null && !launchUrl.trim().isEmpty()) {
+            api.base = launchUrl.trim();
+            etGateway.setText(api.base);
+            setSource("direct", true);
+        }
+
         // 不让输入框抢焦点（否则一进页面就冒出光标手柄和键盘）
         scroll.setFocusableInTouchMode(true);
         etGateway.clearFocus();
@@ -174,9 +182,15 @@ public class MainActivity extends Activity {
         segSerial = segButton("串口");
         segWifi = segButton("WiFi");
         segMock = segButton("模拟器");
+        segDirect = segButton("直连");
         seg.addView(segSerial, Ui.weight1());
         seg.addView(segWifi, Ui.weight1());
         seg.addView(segMock, Ui.weight1());
+        seg.addView(segDirect, Ui.weight1());
+        segSerial.setOnClickListener(v -> setSource("serial", true));
+        segWifi.setOnClickListener(v -> setSource("wifi", true));
+        segMock.setOnClickListener(v -> setSource("mock", true));
+        segDirect.setOnClickListener(v -> setSource("direct", true));
         body.addView(seg, Ui.matchWrap(Ui.dp(this, 10)));
 
         etGateway = input("http://10.0.2.2:8080", InputType.TYPE_TEXT_VARIATION_URI);
@@ -264,6 +278,8 @@ public class MainActivity extends Activity {
         segWifi.setTextColor("wifi".equals(src) ? Ui.ACCENT : Ui.MUTED);
         segMock.setBackground(Ui.bg("mock".equals(src) ? active : 0x00000000, 0, 8, this));
         segMock.setTextColor("mock".equals(src) ? Ui.ACCENT : Ui.MUTED);
+        segDirect.setBackground(Ui.bg("direct".equals(src) ? active : 0x00000000, 0, 8, this));
+        segDirect.setTextColor("direct".equals(src) ? Ui.ACCENT : Ui.MUTED);
         if (etHost != null) etHost.setVisibility("wifi".equals(src) ? View.VISIBLE : View.GONE);
         if (wifiGroup != null) wifiGroup.setVisibility("wifi".equals(src) ? View.VISIBLE : View.GONE);
         if (save) prefs.edit().putString("source", src).apply();
@@ -275,6 +291,11 @@ public class MainActivity extends Activity {
                 .putString("host", etHost.getText().toString()).apply();
         final String src = source;
         final String host = etHost.getText().toString().trim();
+        if ("direct".equals(src)) {
+            api.base = etGateway.getText().toString().trim();
+            tvHint.setText("直连设备 " + api.base + "（不走 PC 网关）");
+            return;
+        }
         tvHint.setText("正在连接 " + src + " …");
         new Thread(() -> {
             try {
@@ -541,14 +562,16 @@ public class MainActivity extends Activity {
         tvState.setBackground(Ui.bg(Ui.CARD_2, conn ? 0xFF2A5A34 : Ui.LINE, 20, this));
 
         String[] srcName = {"serial", "wifi", "mock"};
-        String srcCn = "serial".equals(src) ? "串口" : "wifi".equals(src) ? "WiFi" : "mock".equals(src) ? "模拟器" : "未连接";
+        String local = "device".equals(src) ? "direct" : src;
+        String srcCn = "serial".equals(src) ? "串口" : "wifi".equals(src) ? "WiFi"
+                : "mock".equals(src) ? "模拟器" : "device".equals(src) ? "直连设备" : "未连接";
         String detail = "serial".equals(src) ? s.optString("port", "") : "wifi".equals(src) ? s.optString("host", "") : "";
         tvTitleSub.setText("上位机 · " + srcCn + (detail.isEmpty() ? "" : " " + detail));
 
         // 网关可能已被别处（Web/命令行）切成别源，第一次拿到状态时对齐一下选中态
         if (!sourceSynced && !"none".equals(src)) {
             sourceSynced = true;
-            if (!src.equals(source)) setSource(src, false);
+            if (!local.equals(source)) setSource(local, false);
         }
 
         JSONObject dev = s.optJSONObject("device");
@@ -632,7 +655,7 @@ public class MainActivity extends Activity {
         }
 
         JSONArray raw = s.optJSONArray("raw");
-        if (raw != null) renderRaw(raw, s.optJSONObject("stats"));
+        if (raw != null) renderRaw(raw, s.optJSONObject("stats"), src);
     }
 
     private void renderVitals(JSONObject v) {
@@ -753,7 +776,7 @@ public class MainActivity extends Activity {
         return e.replace("_PSK", "").replace("WPA_", "").replace("WPA2WPA3", "WPA2/3");
     }
 
-    private void renderRaw(JSONArray raw, JSONObject stats) {
+    private void renderRaw(JSONArray raw, JSONObject stats, String src) {
         StringBuilder sb = new StringBuilder();
         int from = Math.max(0, raw.length() - 12);
         for (int i = from; i < raw.length(); i++) {
@@ -764,7 +787,10 @@ public class MainActivity extends Activity {
             if (line.length() > 150) line = line.substring(0, 150) + "…";
             sb.append(line).append('\n');
         }
-        tvLog.setText(sb.length() == 0 ? "等待网关数据…" : sb.toString());
+        boolean direct = "device".equals(src);
+        tvLog.setText(sb.length() == 0
+                ? (direct ? "直连模式：设备不缓存原始流，全量日志请用 PC 网关" : "等待网关数据…")
+                : sb.toString());
         if (tvLogCount != null && stats != null) {
             tvLogCount.setText(stats.optInt("lines", 0) + " 行 · 错误 " + stats.optInt("errors", 0));
         }

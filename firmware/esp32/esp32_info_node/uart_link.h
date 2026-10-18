@@ -25,5 +25,6 @@ void   setUart(bool on);
 
 int    frames();
 int    bad();
+int    bpm();            // 最近一次有效帧的心率，无有效帧返回 0
 
 }  // namespace Vitals

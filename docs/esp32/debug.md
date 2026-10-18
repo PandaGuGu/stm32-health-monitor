@@ -2,7 +2,8 @@
 
 > 记录日期：2026-10-18　环境：Windows 10 · 真机 **ESP32-D0WD-V3**（COM3 / CH340，4 MB Flash）
 > 结论先行：**固件零告警编译通过；真机串口链路与全部 21 条命令实测通过；Web + Android 双端都读到真机数据；
-> WiFi 链路（设备侧 HTTP）待配网后复验。** 下表是本次踩到的坑，正文给证据。
+> 手机直连热点（AP，密码 12345678）全通；STM32 生理数据链路的协议/解析/展示已打通，只差一根线。**
+> 下表是本次踩到的坑，正文给证据。
 
 ## 故障速查表
 
@@ -328,24 +329,92 @@ Program Size: Code=10492 RO-data=3428 RW-data=80 ZI-data=12640
 - **时序**：STM32 每 ~5 s 一帧（受 MAX30102 采样节流），ESP32 侧 5 s 陈阈值刚好卡在边缘，
   接线后要确认 `age_ms` 是否长期贴着 5000 —— 如果经常"过期闪一下"，把 `VITALS_STALE_MS` 调到 8000
 
-## 5. 当前状态与待办
+## 5. 手机直连热点（不经电脑）
+
+需求：手机不接电脑也要看到板子的实时数据。做法是让**设备自己当小网关**：
+
+- 设备侧新增 `/api/status`（与 PC 网关同构的 snapshot，`source=device`）与 `POST /api/cmd`
+- App 增加「直连」档，地址填 `http://192.168.4.1`
+- 热点 `esp32-info-DAD8` / **`12345678`** / 信道 6
+
+### 5.1 验收（PC 连热点 → MuMu 当手机）
+
+```
+$ netsh wlan connect name="esp32-info-DAD8"        # PC 拿到 192.168.4.2
+$ curl http://192.168.4.1/api/status
+source: device | connected: True | host: 192.168.4.1
+device: {'model': 'ESP32-D0WD-V3', 'mac': '20:50:0D:33:DA:D8', 'reset': 'poweron'}
+io.gpio 个数: 23 | series 点数: 28 | stats: {'lines': 28, ...}
+
+$ curl -X POST http://192.168.4.1/api/cmd -d '{"cmd":"vitals.sim 82 96 36.6 0"}'
+{"ok":true,"id":9,"ack":{"t":"ack","data":{"vitals":{"ok":true,"bpm":82,"spo2":96,...}}}}
+```
+
+MuMu 里 `adb shell ping 192.168.4.1` 3.95 ms 通（NAT 走宿主），App 直连后：
+
+- 卡片读到真身：`ESP32-D0WD-V3 / 4 MB / 20:50:0D:33:DA:D8`，`直连设备` 标签
+- 注入帧后生理数据卡实显 `81 BPM / 95% / 36.4 ℃ / 0 s 前`
+- 点 GPIO 4 → 设备侧 `gpio.4=1`（反向控制走 WiFi）
+- 点「扫描」→ 8 个 AP（`FENG -35 WPA3`、`TP-LINK_81F7 OPEN`、两个隐藏 …）
+
+### 5.2 踩坑：一扫描就把手机踢下线
+
+第一版能在直连模式取数，但点「扫描」后 PC 立刻掉线：
+
+```
+$ curl -X POST http://192.168.4.1/api/cmd -d '{"cmd":"scan"}'
+curl: (56) Recv failure: Connection was reset
+$ curl http://192.168.4.1/api/status
+curl: (28) Connection timed out after 8002 milliseconds
+```
+
+根因在固件的扫描实现：**扫描只能在 station 接口上做**，而第一版热点是用 `WiFi.mode(WIFI_AP)` 起的，
+扫描前要临时切 `WIFI_AP_STA`、扫完再切回 `WIFI_AP` —— 这两次模式切换会把已连的客户端全部踢掉。
+
+修法：**开机就用 `AP_STA`**（STA 不连路由器也没关系），扫描不动模式：
+
+```c
+WiFi.mode(WIFI_AP_STA);                                  // 不是 WIFI_AP
+WiFi.softAP(ssid, pass, AP_CHANNEL, 0, 4);
+```
+
+改完两个收益：
+
+| | 改前（纯 AP） | 改后（AP_STA） |
+|---|---|---|
+| 扫描耗时 | 6.8 s（含两次模式切换） | **3.0 s** |
+| 扫描期间客户端 | 被踢下线 | 保持连接（`clients:1`） |
+| 直连模式扫描 | 不可用 | 可用，结果进 `/api/status` 的 `scan` |
+
+顺带补了两处：`scan` 结果缓存在设备上（否则 `/api/status` 里 `scan` 永远是空，App 直连看不到列表），
+以及 AP_STA 但 STA 未连时仍对外报 `mode=ap / state=ap_listening`，避免上位机把"热点模式"显示成"连接中"。
+
+### 5.3 手机侧的注意点
+
+- Android 连上热点会提示"无互联网"，选**保持连接**；部分机型开了"智能网络切换"会把请求切回移动数据，
+  表现为 App 一直转圈 —— 关掉该选项或临时关移动数据
+- 直连模式没有原始流（设备不为日志留内存），App 的"原始数据流"区会提示改用 PC 网关
+- 设备最多 4 个客户端（`softAP(..., 4)`）
+
+## 6. 当前状态与待办
 
 **已验证（真机）**
 
 - 串口链路：`hello` 首帧 500 ms、1 Hz 遥测连续、21 条命令全通、`reboot` 后 `reset=sw` 且网关无感
 - Web/App 双端：都从真机读到型号/MAC/堆/温度/10 个任务、真 AP 列表、真 ack
-- 固件编译：0 error / 0 warning，Flash 61%（807 941 B）
+- 固件编译：0 error / 0 warning，Flash 62%（825 457 B，含直连模式的 60 点序列缓冲）
+- **WiFi 直连（AP）**：PC/MuMu 连热点 → `/api/status` 同构快照、`POST /api/cmd` 生效、
+  点引脚设备侧 `gpio.4=1`、扫描 8 个 AP（3.0 s 且不掉线）
 
 **未验证**
 
-- WiFi 链路：设备侧 `/api/*` 已实现并在 AP 模式下 `http api on :80`，但**还没从 PC 连上 AP 去打接口**
-  （需要 PC 临时连 `esp32-info-DAD8`，或用 `wifi.sta` 配网后走 LAN）
+- **WiFi STA**：`wifi.sta <ssid> <pass>` 配网到路由器、网关切 `--source wifi` 这条路径还没试
 - 热插拔恢复：串口拔掉 → 网关 3 s 重连这一段没做真机拔插验证
 - 长时间稳定性：目前只跑了十几分钟，`heap_min` 还在 242 KB，未做 24 h 观察
 
 下一步建议（按性价比排）：
 
-1. `wifi.sta <你的WiFi> <密码>` 配网 → 网关切 `--source wifi --wifi <设备IP>`，把 WiFi 链路也验掉
-2. 拔插 USB 一次，确认网关 `reconnects` 涨 1 且自动恢复
-3. 接 STM32 `USART1`，把 `vitals` 并进来（见 [architecture.md §5](architecture.md)）
+1. 接 STM32 `USART1`（PA9→GPIO16、共地），确认 `vitals.src` 变成 `stm32`、`age_ms` 稳定在 5–6 s
+2. `wifi.sta <你的WiFi> <密码>` 配网 → 网关切 `--source wifi --wifi <设备IP>`
+3. 拔插 USB 一次，确认网关 `reconnects` 涨 1 且自动恢复
 

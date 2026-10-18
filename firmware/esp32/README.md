@@ -37,7 +37,29 @@ STM32 每周期发一行 `{"bpm":75,"spo2":98,"temp":36.5,"fall":0}`（见
 [protocol.md §8](../../docs/esp32/protocol.md)），ESP32 解析后并入 `telemetry.vitals`。
 **没有 STM32 也能验**：`vitals.sim 78 97 36.5 0` 走的是同一个解析入口。
 
-## 3. 编译
+## 3. 手机直连热点（不用电脑）
+
+ESP32 没有配网时默认开热点，手机连上就能直接看数据 —— **不经过 PC 网关**：
+
+| 项 | 值 |
+|---|---|
+| SSID | `esp32-info-DAD8`（`esp32-info-` + MAC 后 4 位） |
+| 密码 | **`12345678`** |
+| 信道 | 6 |
+| 设备地址 | `http://192.168.4.1` |
+
+步骤：
+
+1. 手机 WiFi 连上 `esp32-info-DAD8`（会提示"无互联网"，选**保持连接**）
+2. 打开 App → 数据源选 **直连** → 网关地址填 `http://192.168.4.1` → 连接
+   （或用 adb 直接指定：`adb shell am start -n com.sit.esp32info/.MainActivity -e url http://192.168.4.1`）
+3. 浏览器也能看：`http://192.168.4.1/` 是纯文本状态页；`/api/status` 是完整 JSON
+4. 想加密码/改 SSID：`wifi.ap <ssid> <密码>`（密码 ≥ 8 位，空则开放热点）
+
+> 设备侧 `/api/status` 与 PC 网关的 snapshot **同构**（`source=device`），所以同一套 App 既能连电脑网关，
+> 也能直连设备。设备不缓存原始日志，App 的"原始数据流"区在直连模式下会提示改用 PC 网关。
+
+## 4. 编译
 
 需要 `arduino-cli` + **esp32 core 2.0.17**（3.x 会把所有芯片的预编译库都当依赖，下载 3–4 GB，
 只跑 ESP32 没必要）。
@@ -61,7 +83,7 @@ Global variables use 45568 bytes (13%) of dynamic memory, leaving 282112 bytes f
 0 error / 0 warning
 ```
 
-## 4. 烧录
+## 5. 烧录
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\build-esp32.ps1 -Upload -Port COM3
@@ -69,14 +91,14 @@ powershell -ExecutionPolicy Bypass -File scripts\build-esp32.ps1 -Upload -Port C
 
 USB 转串口驱动（CH340 / CP210x）装好后再插板；若提示占用，先关掉串口监视器与网关。
 
-## 5. 上电行为
+## 6. 上电行为
 
-1. 读 NVS 里的 WiFi 凭据 → 有就 STA 连网，没有就开 AP：`esp32-info-XXXX` / `esp32info`
+1. 读 NVS 里的 WiFi 凭据 → 有就 STA 连网，没有就开热点：`esp32-info-XXXX` / **`12345678`**（信道 6）
 2. 串口 115200 立刻吐三行：`hello`（身份）、`net`（联网状态）、`telemetry`（首帧遥测）
 3. 之后每 `interval`（默认 1000 ms）一行 `telemetry`；GPIO2 每 500 ms 翻转，作为"我还活着"的硬指标
 4. WiFi 起来后，`http://<设备IP>/` 是纯文本状态页，`/api/*` 供网关轮询或 curl 手测
 
-## 6. 命令速查
+## 7. 命令速查
 
 | 命令 | 作用 |
 |---|---|
@@ -94,7 +116,7 @@ USB 转串口驱动（CH340 / CP210x）装好后再插板；若提示占用，�
 
 上位机会给每条命令加自增 id（`12 scan`），固件在 `ack.id` 里带回，用于请求-响应配对。
 
-## 7. 引脚策略
+## 8. 引脚策略
 
 | 类别 | 引脚 | 说明 |
 |---|---|---|
@@ -104,7 +126,7 @@ USB 转串口驱动（CH340 / CP210x）装好后再插板；若提示占用，�
 
 **ADC2 不开放**：GPIO 0/2/4/12–15/25–27 属于 ADC2，WiFi 一开就读不了，避免"时好时坏"的坑。
 
-## 8. 已知边界
+## 9. 已知边界
 
 - 芯片温度（`temperatureRead()`）比环境高 5–15 ℃，只能看趋势，不能当环境温度
 - `scan` 为**同步阻塞**（1.5–3 s），期间遥测暂停；WIFI_AP 模式下会临时切 `AP_STA` 再切回
@@ -113,3 +135,5 @@ USB 转串口驱动（CH340 / CP210x）装好后再插板；若提示占用，�
 - STM32 主循环 **5–6 s 才发一帧**（500 点采样 + DS18B20 转换），所以 `vitals.ok` 的陈旧阈值是 **8 s**
   而不是 5 s，否则接上线会周期性显示"已过期"
 - GPIO16/17 被 UART2 占用，`gpio.set` / `gpio.mode` 对它们返回 `pin_uart`
+- 热点用 **AP_STA** 起（不是纯 AP）：扫描只能在 station 接口做，纯 AP 下切模式会把已连的手机踢下线
+- 无 STA 连接时 `net.mode` 仍报 `ap`、`state=ap_listening`，避免上位机把"热点模式"误显示成"连接中"

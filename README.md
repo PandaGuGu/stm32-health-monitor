@@ -99,7 +99,7 @@ STM32 四路监测稳定后，下一步是按 `docs/architecture.md §5` 接 ESP
 | ESP32 固件 | `firmware/esp32/esp32_info_node/` | Arduino 框架、WROOM-32、**零第三方库**；上行 JSON Lines / 下行文本命令；串口 + WiFi HTTP 双通路；编译 62% Flash、0 告警 |
 | 上位机网关 | `host/gateway/server.py` | Python（标准库 + pyserial）；串口 / WiFi / **内置模拟器** 三选一；REST + SSE；串口自动重连 |
 | Web 面板 | `host/web/` | 无构建单页：四类信息卡片 + 生理数据、四条 Canvas 曲线、WiFi 扫描表、命令台（带 ack）、原始 JSON 流 |
-| Android App | `host/app/` | Java 原生、无第三方依赖（APK 30 KB），1 Hz 轮询网关；已在 MuMu 模拟器实测 |
+| Android App | `host/app/` | Java 原生、无第三方依赖（APK 30 KB）；四档数据源（串口/WiFi/模拟器/**直连**）；已在 MuMu 与设备热点下实测 |
 | STM32 替身 | `host/tools/stm32_sim.py` | 没有 STM32 时喂生理数据：可走网关注入，也可走真串口 |
 
 ```mermaid
@@ -117,6 +117,7 @@ flowchart LR
     MOCK -. "无硬件时同构替身" .-> GW
     GW -- "REST + SSE" --> WEB
     GW -- "REST 轮询" --> APP
+    APP -. "直连：连设备热点打 http://192.168.4.1" .-> ESP32
 ```
 
 ![Web 面板](docs/esp32/web-dashboard.png)
@@ -139,6 +140,12 @@ python host/gateway/server.py --source mock     # 浏览器自动打开 http://1
 powershell -ExecutionPolicy Bypass -File scripts\build-esp32.ps1 -Upload -Port COM3
 python host/gateway/server.py --source serial --serial COM3
 ```
+
+**没有电脑也能演示** —— 设备自带与网关同构的 HTTP 服务（`source=device`）：手机连热点
+`esp32-info-XXXX`（密码 `12345678`），App 选「直连」填 `http://192.168.4.1` 即可，
+看数据 / 点引脚 / 跑扫描都不经过 PC：
+
+![Android 直连设备热点](docs/esp32/app-mumu-wifi.png)
 
 - 架构与取舍：[docs/esp32/architecture.md](docs/esp32/architecture.md)
 - 协议 v1（字段 / 命令 / 错误码 / 引脚策略）：[docs/esp32/protocol.md](docs/esp32/protocol.md)
