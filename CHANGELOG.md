@@ -3,6 +3,37 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.3.0] - 2026-10-30
+
+联调中发现并修复了 ESP32 侧两个缺陷，同时补一个**只做健康数据展示**的安卓上位机，
+把成品 APK 直接放进仓库，装机即用。
+
+### 新增
+
+- **健康监测 App** `host/app-vitals/`（`com.sit.vitals`，Java 原生、零第三方依赖，APK 25 KB）
+  - 直连 ESP32 `GET /api/status`：四大指标卡片 + 90 点心率趋势 + 数据新鲜度页脚
+  - **只信 `ok == true` 的读数**：门控失败时显示「无读数」，不把 0 或残留旧值画出来
+  - 心率 <60 或 >100、血氧 <95、跌倒 =1 时标红；跌倒首次触发震动一次
+  - 成品 `host/app-vitals/app-vitals.apk` 随仓库分发（debug 签名，`adb install` 直接用）
+  - 无 gradle 时的命令行构建脚本 `build-apk.sh`（aapt2 + d8 + apksigner）
+- `vitals` 新增 `invalid` 字段：格式合法但读数无效的帧数
+
+### 修复
+
+- **`Net::ip()` 漏判 `WIFI_AP_STA`**（`net_info.cpp`）：设备实际运行在 AP_STA（STA 连不上路由器），
+  旧逻辑落到 `localIP()` 返回 `0.0.0.0`，导致 `/` 首页显示 `ip : 0.0.0.0` 并提示
+  「App 里把地址填 http://0.0.0.0」，照做必然连不上。改为 AP / AP_STA 都取 `softAPIP()`。
+- **`bpm = 0` 被当成有效读数**（`uart_link.cpp`）：STM32 门控失败时 `dis_hr`/`dis_spo2` 置 0 后
+  照发，ESP32 旧逻辑认为 0–250 都合法，`ok` 仍为 `true`，上位机把「本轮没测到」显示成
+  「心率 0」，8 s 过期机制形同虚设。现在这类帧计入 `invalid`、不更新数值、**不刷新 `age_ms`
+  计时起点**，8 s 后 `ok` 自然转 `false`；体温（DS18B20）与跌倒（MPU6050）来自独立传感器，
+  不受 PPG 门控影响，照常更新。
+
+### 变更
+
+- `docs/esp32/protocol.md` §3.2 / §8：修正帧周期描述（实测 ~2 s 一帧，原文写 5–6 s）、
+  补充 `invalid` 字段与无读数帧的处理规则
+
 ## [v0.2.0] - 2026-10-18
 
 新增 **ESP32 信息节点** 与配套 **双端上位机**。ESP32 先不接 STM32，单独采自己的芯片/网络/资源/IO，

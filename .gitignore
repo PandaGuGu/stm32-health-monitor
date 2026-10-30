@@ -32,6 +32,7 @@ dist/
 
 # ===== ESP32 固件（arduino-cli 产物） =====
 firmware/esp32/build/
+firmware/esp32/*/build/
 
 # ===== 上位机网关（Python） =====
 host/gateway/__pycache__/
@@ -44,5 +45,11 @@ host/app/app/build/
 host/app/.gradle/
 host/app/.idea/
 host/app/local.properties
+host/app-vitals/app/build/
+host/app-vitals/.gradle/
+host/app-vitals/.idea/
+host/app-vitals/local.properties
 *.apk
+# 发布用的成品 APK 要进仓库，给它们开例外
+!host/app-vitals/app-vitals.apk
 

@@ -154,7 +154,10 @@ bool   Net::connected() { return WiFi.status() == WL_CONNECTED; }
 int    Net::rssi()      { return connected() ? WiFi.RSSI() : 0; }
 
 String Net::ip() {
-  if (WiFi.getMode() == WIFI_AP) return WiFi.softAPIP().toString();
+  // AP 和 AP_STA 都要取 softAPIP()。AP_STA 下 STA 连不上时 localIP() 是 0.0.0.0，
+  // 而首页正是拿这个值提示 App「填 http://<ip>」，判错会把人引到 0.0.0.0 上。
+  wifi_mode_t m = WiFi.getMode();
+  if (m == WIFI_AP || m == WIFI_AP_STA) return WiFi.softAPIP().toString();
   return WiFi.localIP().toString();
 }
 

@@ -39,10 +39,11 @@ OLED 本地显示，异常蜂鸣器报警。维护两套固件：
 | | 位置 | 用途 |
 |---|---|---|
 | 🟠 固件 | `firmware/esp32/` | 芯片/网络/运行时/IO 四类信息，JSON Lines 上行、文本命令下行 |
-| 🟣 上位机 | `host/` | Python 网关（串口/WiFi/模拟器三源）+ Web 单页 + Android 原生 App |
+| 🟣 上位机 | `host/` | Python 网关（串口/WiFi/模拟器三源）+ Web 单页 + Android 原生 App + 健康监测 App（成品 APK 随仓库） |
 
-**当前版本 `v0.2.0`**：ESP32 信息节点与双端上位机已完成，**真机（ESP32-D0WD-V3）串口链路与 21 条命令实测通过，STM32 生理数据链路已打通（协议+解析+双端展示）**。
-版本变更见 [CHANGELOG.md](CHANGELOG.md#v020---2026-10-18)。
+**当前版本 `v0.3.0`**：ESP32 信息节点与三端上位机已完成，**真机（ESP32-D0WD-V3）串口链路与 21 条命令实测通过，STM32 生理数据链路已打通并实测（~2 s 一帧、坏帧 0.25%）**；
+联调中修掉了 `Net::ip()` 漏判 AP_STA 与 `bpm=0` 被当成有效读数两个缺陷。
+版本变更见 [CHANGELOG.md](CHANGELOG.md#v030---2026-10-30)。
 
 **范围说明**：这是学习/课设性质的项目，不是医疗器械；MAX30102 的心率/血氧算法来自
 Maxim 官方参考实现，跌倒判定阈值按实测标定，但**未经临床验证**。
@@ -100,6 +101,7 @@ STM32 四路监测稳定后，下一步是按 `docs/architecture.md §5` 接 ESP
 | 上位机网关 | `host/gateway/server.py` | Python（标准库 + pyserial）；串口 / WiFi / **内置模拟器** 三选一；REST + SSE；串口自动重连 |
 | Web 面板 | `host/web/` | 无构建单页：四类信息卡片 + 生理数据、四条 Canvas 曲线、WiFi 扫描表、命令台（带 ack）、原始 JSON 流 |
 | Android App | `host/app/` | Java 原生、无第三方依赖（APK 30 KB）；四档数据源（串口/WiFi/模拟器/**直连**）；已在 MuMu 与设备热点下实测 |
+| 健康监测 App | `host/app-vitals/` | 只做生理数据展示：四大指标卡 + 90 点心率趋势；**只信 `ok==true`，无读数显示「—」而非 0**；成品 `app-vitals.apk`（25 KB）在仓库内，`adb install` 即用 |
 | STM32 替身 | `host/tools/stm32_sim.py` | 没有 STM32 时喂生理数据：可走网关注入，也可走真串口 |
 
 ```mermaid
@@ -166,10 +168,11 @@ python host/gateway/server.py --source serial --serial COM3
 │  │  └─ gcc/          独立于 Keil 的 GCC 构建系统 + 诊断固件
 │  ├─ MAX30102_sim/    【仿真】Proteus 专用工程，目录结构与上面一致
 │  └─ esp32/           【新】ESP32 信息节点固件（Arduino，esp32_info_node/）
-├─ host/               【新】上位机：gateway（Python）+ web（单页）+ app（Android）+ tools
+├─ host/               上位机：gateway（Python）+ web（单页）+ app（Android）+ app-vitals（健康监测）+ tools
 │  ├─ gateway/         三数据源（串口/WiFi/模拟器）+ REST + SSE
 │  ├─ web/             无构建 Web 面板
 │  ├─ app/             Java 原生 App（零第三方依赖）
+│  ├─ app-vitals/      健康监测 App + 成品 APK + build-apk.sh
 │  └─ tools/           stm32_sim.py：没有 STM32 时喂生理数据
 ├─ sim/
 │  ├─ proteus/         SIT_sim.pdsprj + 被加载的 IIC.hex

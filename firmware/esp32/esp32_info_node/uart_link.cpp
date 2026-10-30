@@ -18,6 +18,7 @@ struct VState {
   uint32_t lastMs = 0;
   uint32_t frames = 0;
   uint32_t bad = 0;
+  uint32_t invalid = 0;  // 格式合法但读数无效（STM32 门控失败时发 bpm=0）
 };
 
 VState   g;
@@ -111,15 +112,22 @@ bool Vitals::feedLine(const String &line, const char *from) {
   if (!getTenths(s, "temp", &temp10)) temp10 = 0;
   if (!getInt(s, "fall", &fall)) fall = 0;
 
-  // 基本合理性：越界数据不采信，避免把 STM32 的异常值原样透传
-  if (bpm < 0 || bpm > 250 || spo2 < 0 || spo2 > 100) {
-    g.bad++;
-    return false;
+  // 格式合法但读数无效：STM32 的 PPG 门控失败时会把 dis_hr/dis_spo2 置 0 后照发，
+  // 这种帧不能当成有效读数，否则上位机会把「本轮没测到」显示成「心率 0」。
+  // 处理办法是不更新数值、也不刷新 lastMs，让 ok 在 VITALS_STALE_MS 后自然转 false，
+  // 与 protocol.md §8 的「过期」语义保持一致。单独计 invalid，便于区分线路问题。
+  if (bpm <= 0 || bpm > 250 || spo2 < 0 || spo2 > 100) {
+    g.invalid++;
+    // 体温（DS18B20）和跌倒（MPU6050）来自独立传感器，不受 PPG 门控影响，
+    // 照常更新；只有心率/血氧保持上一次有效值。
+    if (temp10 > 0) g.temp10 = temp10;
+    g.fall = fall ? 1 : 0;
+    return true;
   }
 
   g.ok = true;
   g.bpm = bpm;
-  g.spo2 = spo2;
+  if (spo2 > 0) g.spo2 = spo2;  // 血氧门单独失效时保留上一次有效值，别把心率一起丢掉
   g.temp10 = temp10;
   g.fall = fall ? 1 : 0;
   snprintf(g.from, sizeof(g.from), "%s", from ? from : "uart");
@@ -147,6 +155,7 @@ void Vitals::echoSample() {
 bool Vitals::uartOn()      { return g_uartOn; }
 int  Vitals::frames()      { return (int)g.frames; }
 int  Vitals::bad()         { return (int)g.bad; }
+int  Vitals::invalid()     { return (int)g.invalid; }
 int  Vitals::bpm()         { return g.ok ? g.bpm : 0; }
 
 void Vitals::setUart(bool on) {
@@ -177,6 +186,7 @@ String Vitals::fields() {
   if (g.ok) f += String(age); else f += "null";
   f += ",\"frames\":" + String(g.frames);
   f += ",\"bad\":" + String(g.bad);
+  f += ",\"invalid\":" + String(g.invalid);
   f += ",\"uart\":" + String(g_uartOn ? "true" : "false");
   f += "}";
   return f;

@@ -24,7 +24,8 @@ bool   uartOn();
 void   setUart(bool on);
 
 int    frames();
-int    bad();
+int    bad();            // 帧格式坏（缺 bpm / 超范围 / 解析失败）
+int    invalid();        // 格式合法但读数无效（门控失败时 STM32 发的 bpm=0）
 int    bpm();            // 最近一次有效帧的心率，无有效帧返回 0
 
 }  // namespace Vitals
