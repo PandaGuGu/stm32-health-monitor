@@ -8,6 +8,7 @@
 // ============================================================
 #include <Arduino.h>
 
+#include "ble_link.h"
 #include "cmd_router.h"
 #include "config.h"
 #include "device_info.h"
@@ -32,6 +33,7 @@ void setup() {
   Vitals::begin();          // UART2：接 STM32
   Net::begin();
   HttpApi::begin();
+  Ble::begin();             // 蓝牙链路：ENABLE_BLE=0 时是空实现
 
   // 一上电就把身份和网络状态吐出来，上位机不必等轮询
   Device::emitHello();
@@ -49,6 +51,7 @@ void loop() {
   Cmd::poll();
   Vitals::loop();           // 收 STM32 的 vitals 帧
   HttpApi::loop();
+  Ble::loop();              // 蓝牙链路：有新帧就 notify（可选）
 
   uint32_t now = millis();
   if (now - s_lastTelemetry >= Cmd::intervalMs()) {

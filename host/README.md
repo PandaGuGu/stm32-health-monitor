@@ -7,6 +7,7 @@ host/
 ├─ gateway/       Python 网关：串口 / WiFi / 模拟器 三种数据源，REST + SSE
 ├─ web/           单页面板（无构建、无依赖），由网关直接托管
 ├─ app/           Android 原生 App（Java，零第三方库），Gradle 构建
+├─ app-vitals/    健康监测 App（本地工程，不入库；三档链路，成品 APK 见 Releases）
 └─ tools/         stm32_sim.py：没有 STM32 时的生理数据模拟器
 ```
 
@@ -115,7 +116,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 截图：[docs/esp32/app-mumu-1.png](../docs/esp32/app-mumu-1.png)、
 [docs/esp32/app-mumu-2.png](../docs/esp32/app-mumu-2.png)
 
-## 6. 没有 STM32 时怎么验生理数据
+## 6. 远程监测（另一条链路）
+
+`host/` 这一套的前提是**手机与设备同网**：同一路由器，或连设备自带热点。要异地看数据
+（家属远程查看、设备随身带走），走独立的远程监测方案 [`remote/`](../remote/)：
+ESP32 主动 POST 到公网中继，异地 App 轮询中继取最新一帧，两端不需要互相可达。
+
+两条链路不冲突，可以同时开：设备一边在 80 端口应答同网的上位机，一边往后端定时推送。
+定位差异、部署步骤、帧龄算法与取舍：[`remote/README.md`](../remote/README.md)。
+
+## 7. 没有 STM32 时怎么验生理数据
 
 `host/tools/stm32_sim.py` 是 STM32 的替身，两种喂法：
 
@@ -132,7 +142,7 @@ python host/tools/stm32_sim.py --serial COM7
 A 模式用的是 ESP32 固件的 `vitals.sim` 命令，与真串口**共用同一个解析函数**，
 所以"注入能通"等于"解析这段逻辑能通"；接上 STM32 后只多验电平/波特率/共地。
 
-## 7. 构建注意（踩过的坑）
+## 8. 构建注意（踩过的坑）
 
 - 仓库路径含中文（`小组嵌入式`），AGP 会直接报 "project path contains non-ASCII characters" 并退出。
   `host/app/gradle.properties` 里已加 `android.overridePathCheck=true`，实测 8.7.3 + Gradle 8.14.3 构建正常

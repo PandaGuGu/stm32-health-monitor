@@ -101,7 +101,7 @@ STM32 四路监测稳定后，下一步是按 `docs/architecture.md §5` 接 ESP
 | 上位机网关 | `host/gateway/server.py` | Python（标准库 + pyserial）；串口 / WiFi / **内置模拟器** 三选一；REST + SSE；串口自动重连 |
 | Web 面板 | `host/web/` | 无构建单页：四类信息卡片 + 生理数据、四条 Canvas 曲线、WiFi 扫描表、命令台（带 ack）、原始 JSON 流 |
 | Android App | `host/app/` | Java 原生、无第三方依赖（APK 30 KB）；四档数据源（串口/WiFi/模拟器/**直连**）；已在 MuMu 与设备热点下实测 |
-| 健康监测 App | `host/app-vitals/` | 只做生理数据展示：四大指标卡 + 90 点心率趋势；**只信 `ok==true`，无读数显示「—」而非 0**；成品 `app-vitals.apk`（25 KB）在仓库内，`adb install` 即用 |
+| 健康监测 App | `host/app-vitals/`（本地工程，不入库） | 只做生理数据展示：**首页只有四张指标卡 + 心率趋势**，链路选择、地址、帧计数收进右上角齿轮；**三档链路**（本地直连 / 远程中继 / 蓝牙）；**只信 `ok==true`，无读数显示「—」而非 0**；成品 APK 走 GitHub Releases 分发 |
 | STM32 替身 | `host/tools/stm32_sim.py` | 没有 STM32 时喂生理数据：可走网关注入，也可走真串口 |
 
 ```mermaid
@@ -154,6 +154,70 @@ python host/gateway/server.py --source serial --serial COM3
 - 搭建与调试记录（13 条速查表 + 真机命令回归）：[docs/esp32/debug.md](docs/esp32/debug.md)
 - 上位机用法与接口表：[host/README.md](host/README.md)
 
+## 远程监测方案（并列链路，v0.4.0）
+
+上面那套要求「手机和设备在同一网络」——同一路由器，或连设备自带热点。要异地看数据
+（家属远程查看、设备随身带走、人在外面想知道家里老人的状态），需要在旁边再挂一条链路：
+ESP32 主动把每一帧推给一台公网中继，异地 App 轮询中继取最新值。
+
+它是**独立方案**，不是局域网方案的升级：两者同时存在，可以同时开着，也可以只开一个。
+
+| | 局域网方案（v0.2.0） | 远程监测方案（v0.4.0） |
+|---|---|---|
+| 手机与设备 | 必须同网 | 任意网络 |
+| 谁发起 | 对端来拉（设备监听 :80） | 设备主动推（不监听端口） |
+| 中间件 | `host/gateway`（可选，直连时不要） | `remote/relay_server.py`（必须） |
+| 数据留存 | 网关进程内 + 日志 | 无，只有最新一帧 |
+| 断网表现 | App 连不上，直接报错 | App 仍连得上，靠帧龄显示 `—` |
+| 适用 | 实验台调试、答辩演示 | 异地看护、外出携带 |
+
+```
+ESP32 ──BLE──▶ 采集手机 ──POST /api/vitals──▶ 中继（内存一帧）──GET /api/status──▶ 异地 App
+                    └── SQLite 7 天
+```
+
+| 部件 | 位置 | 说明 |
+|---|---|---|
+| 中继 | [`remote/relay_server.py`](remote/relay_server.py) | 纯标准库，不落盘；一帧覆盖一帧，进程退出即清空；Basic Auth 双向校验 |
+| 上行 | App `CloudClient`（本地工程，不入库） | 蓝牙档收帧后 POST；单线程、在途即丢新帧、失败节流 |
+| 本地历史 | App `Store`（本地工程，不入库） | SQLite 保留 7 天，5 s 降采样，只存有效帧 |
+| 查看端 | 同一个 APK，连接方式选「远程中继」 | 填中继地址与账号即可，不需要另外编译 |
+
+```bash
+python remote/relay_server.py --port 8000 --user test1 --pass stm-esp-test1
+# App：齿轮 →「云端（远程中继）」填地址/账号/密码，蓝牙档连上即自动上行
+```
+
+固件不含任何上报代码：设备只做「收 STM32 帧 + BLE 通知 + 本地 HTTP」，外网这一段由手机完成，
+板子因此不需要 WiFi 凭据，也不必在 BLE 与 WiFi 之间争抢射频。
+
+云端不存历史是这套方案的前提，不是缺陷：0.5 Hz 的观测流量、没有跨端回放需求，数据库只会多一层要维护的东西。
+为了在有数据和无数据之间划清界线，中继把「设备侧帧龄 + 中继侧滞留」相加，`null` 时直接判无读数——
+只算中继侧的话，STM32 断线但采集手机仍在定时上报时，App 会一直显示旧读数。
+
+方案说明、部署步骤、帧龄算法、故障速查与实测记录：[remote/README.md](remote/README.md)
+
+## 蓝牙链路（v0.5.0）
+
+不连 WiFi、不开热点、也不经过任何服务器——BLE 就近直连：
+
+```
+ESP32 ──BLE NUS notify──▶ 手机 App
+```
+
+| 项 | 值 |
+|---|---|
+| 广播名 | `stm32-vitals-XXXX`（`BLE_NAME` + MAC 后 4 位） |
+| 服务 | Nordic UART Service `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` |
+| 载荷 | 与 `/api/status` 的 `vitals` 段同一个 JSON，约 132 字节 |
+| 编译 | `-Define ENABLE_BLE=1`，且必须用 `huge_app` 分区（BLE 栈让固件涨到 1.73 MB） |
+
+固件侧 `ble_link.{h,cpp}`，App 侧 `BleClient.java`，收帧后交给同一个解析函数，
+所以三条链路（本地 / 远程 / 蓝牙）在界面上只有状态栏与页脚的文字不同。
+
+细节、实测数据与两个踩过的坑（`neverForLocation`、中文路径编译）：
+[firmware/esp32/README.md](firmware/esp32/README.md)
+
 ## 目录结构
 
 ```
@@ -167,13 +231,14 @@ python host/gateway/server.py --source serial --serial COM3
 │  ├─ MAX30102/        【实物】正点原子标准库 Keil 工程（USER/IIC.uvprojx）
 │  │  └─ gcc/          独立于 Keil 的 GCC 构建系统 + 诊断固件
 │  ├─ MAX30102_sim/    【仿真】Proteus 专用工程，目录结构与上面一致
-│  └─ esp32/           【新】ESP32 信息节点固件（Arduino，esp32_info_node/）
+│  └─ esp32/           ESP32 信息节点固件（Arduino，esp32_info_node/；可选 BLE 外设）
 ├─ host/               上位机：gateway（Python）+ web（单页）+ app（Android）+ app-vitals（健康监测）+ tools
 │  ├─ gateway/         三数据源（串口/WiFi/模拟器）+ REST + SSE
 │  ├─ web/             无构建 Web 面板
 │  ├─ app/             Java 原生 App（零第三方依赖）
-│  ├─ app-vitals/      健康监测 App + 成品 APK + build-apk.sh
+│  ├─ app-vitals/      健康监测 App（本地工程，不入库；成品 APK 见 Releases）
 │  └─ tools/           stm32_sim.py：没有 STM32 时喂生理数据
+├─ remote/             远程监测方案（独立链路）：公网中继 relay_server.py + 方案说明
 ├─ sim/
 │  ├─ proteus/         SIT_sim.pdsprj + 被加载的 IIC.hex
 │  └─ wokwi/           Wokwi 网页版方案（diagram.json + sketch.ino）

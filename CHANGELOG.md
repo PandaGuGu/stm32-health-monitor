@@ -3,6 +3,120 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.6.0] - 2026-10-30
+
+远程监测方案改为**「App 上行 + 账号鉴权 + App 本地 7 天」**：设备不再自己往外推，
+云端仍然不落盘，历史保存在采集手机本地。
+
+### 新增
+
+- **中继换成 HTTP Basic Auth**（`remote/relay_server.py`）：`X-Token` 移除，上行与下行都校验
+  `Authorization: Basic`，缺凭据或密码错误一律 401 并带 `WWW-Authenticate`；密码比较用
+  `hmac.compare_digest`。内置测试账号 `test1` / `stm-esp-test1`，可用 `--user` / `--pass`
+  或 `RELAY_USER` / `RELAY_PASS` 覆盖
+- **App 云端上行**（`CloudClient`，本地工程）：蓝牙档每帧 `POST /api/vitals`
+  - 单线程池执行，同一时刻只发一个请求，在途时丢弃新帧，不排队堆风暴
+  - 只推 `ok==true` 的帧，并把设备侧 `age_ms` 原样带上，供中继做两段帧龄相加
+  - 失败节流：首次失败、恢复、之后每 30 次各一行，绝不打扰本地显示
+- **App 本地历史**（`Store`，本地工程）：SQLite 一张表 `hist(ts,bpm,spo2,temp,fall)`
+  - 保留 7 天，5 s 降采样，只存有效帧；每小时最多清理一次过期行
+  - 首页趋势图启动时从库里 seed，关掉 App 再开曲线还在
+- **设置页新增两个分组**：`云端（远程中继）`（地址 / 账号 / 密码 / 自动上传开关）、
+  `本地历史`（条数、最早时间、清空按钮）
+
+### 移除
+
+- **固件侧上报模块** `firmware/esp32/esp32_info_node/cloud_link.{h,cpp}` 及其配置
+  （`ENABLE_CLOUD` / `CLOUD_URL` / `CLOUD_TOKEN` / `CLOUD_INTERVAL_MS` / `CLOUD_TIMEOUT_MS`）
+  - 上行改由 App 完成，设备只负责「收 STM32 帧 + BLE 通知 + 本地 HTTP」
+  - 原实现仍发 `X-Token`，在新中继上必然 401；且设备常连 WiFi 会与 BLE 分时争抢射频
+  - 默认构建本就未编译该模块，移除后固件体积、行为、功耗均无变化
+    （`ENABLE_BLE=1` + `huge_app` 实测 1 732 567 B，移除前 1 732 599 B，差 32 字节来自链接期空实现）
+
+### 变更
+
+- `remote/README.md` 重写：上行执行者从设备改为 App，部署补 HTTPS 反代，新增「本地 7 天」一节
+- 单个中继只服务一个采集端：两台上报会互相覆盖同一帧
+- **App 源码与 APK 不再入库**：`host/app-vitals/` 加入 `.gitignore` 并从索引移除（本地文件保留），
+  成品 APK 改由 GitHub Releases 分发，仓库里只留固件、网关、Web 与中继服务
+
+## [v0.5.0] - 2026-10-30
+
+新增**蓝牙链路**：手机不用连 WiFi、也不经过任何服务器，直接用 BLE 收 vitals。
+固件侧新增 BLE NUS 外设，App 新增第三档「蓝牙」，三条链路共用一套显示逻辑。
+
+### 新增
+
+- **BLE 外设** `firmware/esp32/esp32_info_node/ble_link.{h,cpp}`
+  - Nordic UART Service `6E400001-…`：通知特征 `6E400003-…`（设备→手机），
+    写特征 `6E400002-…`（预留，当前固件不解析）
+  - `config.h` 新增 `ENABLE_BLE`（默认 `0`）、`BLE_NAME`、`BLE_MTU`、`BLE_NOTIFY_MS`
+  - 有新的有效帧立刻 notify，没有也按 2 s 兜底推一次——手机才能区分「设备在但没读数」
+    和「设备已经掉了」
+  - 断开后自动重启广播；广播名 `stm32-vitals-` + MAC 后四位
+- **App 蓝牙档** `host/app-vitals/.../BleClient.java`
+  - 扫 `stm32-vitals*`：名字匹配失败时用 NUS 服务 UUID 兜底（部分机型拿不到 scan response 里的名字）
+  - `requestMtu(517)`；协商不到 40 字节以上直接报错，不静默截断（截断的 JSON 必然解析失败）
+  - 收帧交给 `VitalsClient.parse()`，与 HTTP 链路共用同一套字段映射，不为蓝牙另写解析
+  - 蓝牙源打 `viaBle` 标记，进设置页诊断区的「当前链路」；该链路没有的 `runtime` / `device` 显示 `—`
+- 三档链路切换（本地直连 / 远程中继 / 蓝牙），蓝牙档把地址行与连接按钮置灰
+
+### 变更
+
+- **首页精简，设置项收进右上角齿轮**（`host/app-vitals`）
+  - 首页只留状态、四张指标卡、心率趋势：地址栏、连接按钮、链路切换、帧计数页脚全部移除
+  - 新增 `SettingsActivity`：连接方式（三档 chip）、服务器地址、诊断区（当前链路 / 数据新鲜度 /
+    有效帧 / 坏帧 / 无读数帧 / 运行时长 / 芯片型号 / 固件版本）
+  - 新增 `Cfg.java` 承载两个 Activity 共用的配色、偏好键与几何工具，避免两边各写一份后跑偏
+  - 首页状态栏不再暴露链路与数据源，一律只写「已连接 / 未连接」；链路名挪到设置页诊断区
+  - 升级兼容：旧版只有 `addr` 一个键，首次启动把它当作本地档地址迁移到 `addr_local`
+- **构建默认分区改为 `huge_app`**：BLE 栈让固件从 986 KB 涨到 1.73 MB，
+  默认分区只给应用 1.3 MB，会报 `text section exceeds available space in board`
+- `scripts/build-esp32.ps1` 重写
+  - 先把 sketch 复制到 `%TEMP%\esp32build` 再编译：`xtensa-g++` 在中文路径下会**静默崩溃**，
+    只报 `Error during build: exit status 1` 且没有任何错误行，编译器进程 CPU 停在 0.1 s
+  - 新增 `-Define ENABLE_BLE=1,ENABLE_CLOUD=1` 传编译宏
+  - 自动在常见安装位置查找 `arduino-cli`
+  - 输出统一 UTF-8，避免中文提示在 GBK 控制台变成乱码
+
+### 修复
+
+- **Android 12+ 扫描结果被系统整体过滤**（`AndroidManifest.xml`）：`BLUETOOTH_SCAN` 缺少
+  `android:usesPermissionFlags="neverForLocation"`，即使权限已授予，扫描回调也一条都不来。
+  表现为 App 提示「没找到 stm32-vitals* 设备」，而系统蓝牙设置页能看到该设备
+- 重复 `startScan` 报 `SCAN_FAILED_ALREADY_STARTED`（code 1）：启动前先 `stopScan` 清场
+
+## [v0.4.0] - 2026-10-30
+
+新增**远程监测方案**，与现有局域网方案并列：设备主动上报到公网中继，异地 App 轮询取数。
+中继不存数据，只保留最新一帧。
+
+### 新增
+
+- **远程监测方案** `remote/`
+  - `remote/relay_server.py`：纯标准库中继。`POST /api/vitals` 覆盖内存里唯一一帧，
+    `GET /api/status` 返回与设备同构的快照，`GET /api/health` 给收帧数与帧龄；
+    无数据库、无落盘、进程退出即清空；可选 `--token` 鉴权与 `--stale` 掉线阈值
+  - `remote/README.md`：定位对照（与局域网方案八项差异）、部署步骤（含 systemd 单元与
+    内网穿透）、帧龄算法、五条边界、故障速查、实测记录
+- **固件上行模块** `firmware/esp32/esp32_info_node/cloud_link.{h,cpp}`
+  - `config.h` 新增 `ENABLE_CLOUD`（默认 `0`）、`CLOUD_URL`、`CLOUD_TOKEN`、`CLOUD_INTERVAL_MS`
+  - `ENABLE_CLOUD=0` 时 `Cloud::begin()/loop()` 为 .cpp 内的空实现，现有固件行为与体积不变
+  - 只在 WiFi 已连上时发送；AP 兜底模式直接返回，不计数、不报错
+  - 失败日志节流：状态码异常只在首次失败、恢复、或每 30 次时打一行
+- `vitals` 帧整段（含设备侧 `ok` / `age_ms`）原样上行，而非只发四个数字
+
+### 变更
+
+- `host/app-vitals` 无需改动即可接入远程方案：中继在 `/api/status` 路径应答同构快照，
+  App 只把地址栏改成中继地址，不用重新编译
+
+### 说明
+
+- 中继不存储：无历史、无回放、无离线补传，重启即清空；趋势由 App 的 90 点滚动窗口自己攒
+- 明文 HTTP，`X-Token` 随报文裸传，只能防误连、防不了抓包；需要时用 Nginx/Caddy 反代上 HTTPS
+- 一个中继实例对应一台设备，多设备多起实例
+
 ## [v0.3.0] - 2026-10-30
 
 联调中发现并修复了 ESP32 侧两个缺陷，同时补一个**只做健康数据展示**的安卓上位机，

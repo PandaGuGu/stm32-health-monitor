@@ -21,7 +21,8 @@ firmware/esp32/
 │  ├─ io_probe.*            GPIO 白名单、电平、ADC1、芯片温度
 │  ├─ uart_link.*           UART2 ↔ STM32：收 vitals 帧、解析、并入 telemetry
 │  ├─ cmd_router.*          下行命令解析与派发
-│  └─ http_api.*            WiFi 模式下的 /api/* 接口
+│  ├─ http_api.*            WiFi 模式下的 /api/* 接口
+│  ├─ ble_link.*            蓝牙链路（可选，ENABLE_BLE=1）：BLE NUS 外设，notify vitals
 └─ build/                   编译产物（不入库）
 ```
 
@@ -59,6 +60,23 @@ ESP32 没有配网时默认开热点，手机连上就能直接看数据 —— 
 > 设备侧 `/api/status` 与 PC 网关的 snapshot **同构**（`source=device`），所以同一套 App 既能连电脑网关，
 > 也能直连设备。设备不缓存原始日志，App 的"原始数据流"区在直连模式下会提示改用 PC 网关。
 
+### 蓝牙（BLE）
+
+WiFi 没配、也不想到手开热点时，用 BLE 就近收数据。固件需按 `ENABLE_BLE=1` 编译。
+
+| 项 | 值 |
+|---|---|
+| 广播名 | `stm32-vitals-XXXX`（`BLE_NAME` + MAC 后 4 位，如 `stm32-vitals-DAD8`） |
+| 服务 | Nordic UART Service `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` |
+| 通知特征 | `6E400003-…`（设备 → 手机，`{"vitals":{...}}` 原样，约 132 字节） |
+| 写特征 | `6E400002-…`（手机 → 设备，当前固件不解析，只为 UUID 完整） |
+| MTU | 设备侧申请 517，手机端需 `requestMtu` 到 40 以上，否则一帧装不下会直接跳过不发 |
+
+- 每 2 s 推一次（`BLE_NOTIFY_MS`）；有新有效帧时立刻推，没有也会按周期兜底推，
+  这样手机能区分「设备在但没读数」和「设备掉了」
+- 与 WiFi 共存可用，但射频分时，两边吞吐都会下降
+- 断开后固件自动重启广播；手机侧不自动重连，需手动再选一次「蓝牙」档
+
 ## 4. 编译
 
 需要 `arduino-cli` + **esp32 core 2.0.17**（3.x 会把所有芯片的预编译库都当依赖，下载 3–4 GB，
@@ -69,19 +87,29 @@ ESP32 没有配网时默认开热点，手机连上就能直接看数据 —— 
 arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 arduino-cli core install esp32:esp32@2.0.17 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 
-# 编译（仓库自带脚本）
+# 编译（仓库自带脚本，默认 huge_app 分区）
 powershell -ExecutionPolicy Bypass -File scripts\build-esp32.ps1
-# 或直接
-arduino-cli compile --fqbn esp32:esp32:esp32 --build-path firmware\esp32\build firmware\esp32\esp32_info_node
+
+# 带蓝牙
+powershell -ExecutionPolicy Bypass -File scripts\build-esp32.ps1 -Define ENABLE_BLE=1
 ```
 
-实测结果（2026-10-18，`--warnings all`）：
+`ENABLE_BLE` 在 `config.h` 里，默认 `0`。关闭时模块内函数是空实现，sketch 无条件调用也能链接。
 
-```
-Sketch uses 807941 bytes (61%) of program storage space. Maximum is 1310720 bytes.
-Global variables use 45568 bytes (13%) of dynamic memory, leaving 282112 bytes for local variables.
-0 error / 0 warning
-```
+**BLE 必须用 `huge_app` 分区**（脚本默认已是）：BLE 栈让固件从 986 KB 涨到 1.73 MB，
+默认分区只给应用 1.3 MB，会直接报 `text section exceeds available space in board`。
+
+⚠️ **仓库父目录含中文（`心率血`），`xtensa-g++` 在中文路径下会静默崩溃**
+（只报 `Error during build: exit status 1`，没有任何错误行，编译器进程卡在 0.1 s CPU）。
+`build-esp32.ps1` 因此先把 sketch 复制到 `%TEMP%\esp32build` 再编译；手工调用 `arduino-cli` 时
+也要自己复制到英文路径，否则会以为是代码写错了。
+
+实测结果（2026-10-30，esp32 core 3.3.12）：
+
+| 配置 | Flash | RAM |
+|---|---|---|
+| 默认（无 BLE） | 986 916 B / 75% | 49 104 B |
+| `ENABLE_BLE=1`（huge_app） | 1 732 567 B / 55% | 64 596 B |
 
 ## 5. 烧录
 

@@ -53,3 +53,6 @@ host/app-vitals/local.properties
 # 发布用的成品 APK 要进仓库，给它们开例外
 !host/app-vitals/app-vitals.apk
 
+
+# ===== 健康监测 App（源码与 APK 不入库，成品走 GitHub Releases）=====
+host/app-vitals/
