@@ -29,9 +29,10 @@
     RELAY_USER=test1 RELAY_PASS=stm-esp-test1 python remote/relay_server.py
 
 安全：内置凭据仅为测试账号，公网部署前必须用 --user/--pass 或环境变量换掉。
-"""
 
-from __future__ import annotations
+运行环境：Python 3.6+（CentOS 7 / Alibaba Cloud Linux 3 自带的 python3 是 3.6，
+所以这里不用 PEP 604 的 `str | None` 写法，也不用 3.9+ 的内建泛型注解）。
+"""
 
 import argparse
 import base64
@@ -42,11 +43,11 @@ import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, Dict, Optional
 
 LOCK = threading.Lock()
-PAYLOAD: dict[str, Any] = {}  # 只留一帧：最后一次 POST 解包后的 vitals
-STATS: dict[str, Any] = {"rx_frames": 0, "rx_bad": 0, "rx_denied": 0, "last_rx": 0.0}
+PAYLOAD: Dict[str, Any] = {}  # 只留一帧：最后一次 POST 解包后的 vitals
+STATS: Dict[str, Any] = {"rx_frames": 0, "rx_bad": 0, "rx_denied": 0, "last_rx": 0.0}
 
 # 测试账号。仅用于本地验证与演示，公网部署前必须换掉。
 DEF_USER = "test1"
@@ -65,13 +66,13 @@ VITALS_KEYS = ("bpm", "spo2", "temp", "fall")
 REALM = 'Basic realm="vitals-relay", charset="UTF-8"'
 
 
-def unwrap(data: dict[str, Any]) -> dict[str, Any]:
+def unwrap(data: Dict[str, Any]) -> Dict[str, Any]:
     """App 发的是 {"vitals":{...}}，手测时可能只发扁平四字段，两种都收。"""
     inner = data.get("vitals")
     return inner if isinstance(inner, dict) else data
 
 
-def check_credentials(header: str | None) -> bool:
+def check_credentials(header: Optional[str]) -> bool:
     """校验 Authorization: Basic base64(user:pass)。
 
     用 compare_digest 而不是 ==，避免逐字节短路带来的时序侧信道。
@@ -88,7 +89,7 @@ def check_credentials(header: str | None) -> bool:
     return hmac.compare_digest(user, ARGS.user) and hmac.compare_digest(pw, ARGS.password)
 
 
-def snapshot() -> dict[str, Any]:
+def snapshot() -> Dict[str, Any]:
     with LOCK:
         if not PAYLOAD:
             return {
@@ -112,7 +113,7 @@ def snapshot() -> dict[str, Any]:
         else:
             age = rx_age
 
-        vitals: dict[str, Any] = {k: PAYLOAD.get(k) for k in VITALS_KEYS}
+        vitals: Dict[str, Any] = {k: PAYLOAD.get(k) for k in VITALS_KEYS}
         vitals["ok"] = (
             bool(PAYLOAD.get("ok", True))
             and age is not None

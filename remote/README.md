@@ -59,6 +59,9 @@ flowchart LR
 
 ### 3.1 起中继
 
+依赖只有 python3，**3.6 起即可**（CentOS 7、Alibaba Cloud Linux 3 自带的 `python3` 就是 3.6，
+不需要额外装包；脚本里因此避开了 PEP 604 与内建泛型注解）。
+
 ```bash
 python remote/relay_server.py --port 8000
 python remote/relay_server.py --user test1 --pass stm-esp-test1 --port 8000
