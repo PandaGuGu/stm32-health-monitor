@@ -19,6 +19,8 @@
 接口：
     POST /api/vitals   {"vitals":{"ok":true,"bpm":88,...}}  或扁平 {"bpm":88,...}
                        需 Basic Auth；覆盖上一帧
+                       跌倒报警帧另带 fall_ts（"yyyy-MM-dd HH:mm:ss"）与 fall_ms（epoch 毫秒），
+                       中继原样透传，查看端据此显示报警时刻
     GET  /api/status   与 /api/latest 同义，返回 {"source":"relay","vitals":{...}}
                        需 Basic Auth（app-vitals 拼的是这个路径）
     GET  /api/health   收帧数、坏帧数、帧龄；需 Basic Auth
@@ -62,7 +64,7 @@ ARGS = argparse.Namespace(
     verbose=False,
 )
 
-VITALS_KEYS = ("bpm", "spo2", "temp", "fall")
+VITALS_KEYS = ("bpm", "spo2", "temp", "fall", "fall_ts", "fall_ms")
 REALM = 'Basic realm="vitals-relay", charset="UTF-8"'
 
 
