@@ -3,6 +3,18 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.7.3] - 2026-11-01
+
+跌倒记录横幅去掉状态文字（App 0.0.7）。横幅不再区分「进行中 / 已恢复」，
+只显示报警时刻；跌倒恢复后外观不变，仍然只有「关闭」能清除。
+
+### 变更
+
+- **App**：删除 `bannerFallState` 及其创建、刷新逻辑；`updateFall` 在 `fall` 归 0 时
+  仍调用 `refreshFallBanner()`，但横幅外观只取决于「有无记录」，与恢复与否无关
+- **网页端**（`local_web`，不入库）：`fallRecord` 去掉 `active` 字段，
+  删除 `.fb-state` 与 `.fallbar.live` 脉冲动效；「关闭」按钮改由 `margin-left: auto` 右对齐
+
 ## [v0.7.2] - 2026-11-01
 
 跌倒记录改为**前台常驻**（App 0.0.6）。弹窗只负责打断一次，关掉就没了；
