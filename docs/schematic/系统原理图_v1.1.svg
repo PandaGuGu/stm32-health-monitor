@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 635" width="100%" role="img">
+  <title>STM32F103C8T6 健康监测仪系统原理图 v1.1</title>
+  <desc>STM32F103C8T6 与 MAX30102、MPU6050、SSD1306、DS18B20、蜂鸣器、ESP32、ST-Link 的全部信号接线、3.3 V 与 GND 电源域，以及 5 V→3.3 V 供电链</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <text x="340" y="48" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">健康监测仪 · 系统原理图 v1.1</text>
+  <line x1="40" y1="64" x2="640" y2="64" stroke="#A32D2D" stroke-width="1.5"/>
+  <text x="40" y="56" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#A32D2D">3.3 V</text>
+  <line x1="40" y1="545" x2="640" y2="545" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="636" y="539" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#5F5E5A">GND</text>
+  <line x1="44" y1="64" x2="44" y2="426" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="44" y1="150" x2="56" y2="150" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="44" y1="242" x2="56" y2="242" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="44" y1="334" x2="56" y2="334" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="44" y1="426" x2="56" y2="426" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="50" y1="180" x2="50" y2="545" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="50" y1="180" x2="56" y2="180" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="50" y1="272" x2="56" y2="272" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="50" y1="364" x2="56" y2="364" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="50" y1="456" x2="56" y2="456" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="636" y1="64" x2="636" y2="334" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="624" y1="150" x2="636" y2="150" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="624" y1="242" x2="636" y2="242" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="624" y1="334" x2="636" y2="334" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="630" y1="180" x2="630" y2="545" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="624" y1="180" x2="630" y2="180" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="624" y1="272" x2="630" y2="272" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="624" y1="364" x2="630" y2="364" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="340" y1="64" x2="340" y2="80" stroke="#A32D2D" stroke-width="1"/>
+  <line x1="340" y1="520" x2="340" y2="545" stroke="#5F5E5A" stroke-width="1"/>
+  <rect x="56" y="112" width="150" height="76" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="131" y="134" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#085041">MAX30102 心率血氧</text>
+  <text x="131" y="152" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">软件 I²C · 0x57</text>
+  <text x="131" y="170" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">INT 轮询 30ms 超时</text>
+  <rect x="56" y="204" width="150" height="76" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="131" y="226" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#085041">MPU6050 六轴</text>
+  <text x="131" y="244" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">跌倒判定 · 0x68</text>
+  <text x="131" y="262" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">±16g · 2048 LSB/g</text>
+  <rect x="56" y="296" width="150" height="76" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="131" y="318" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#085041">SSD1306 OLED</text>
+  <text x="131" y="336" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">0.96" 128×64 · 0x3C</text>
+  <text x="131" y="354" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">单色 · 软件 I²C</text>
+  <rect x="56" y="388" width="150" height="76" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="131" y="410" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#085041">DS18B20 体温</text>
+  <text x="131" y="428" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">1-Wire · ±0.5℃</text>
+  <text x="131" y="446" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#0F6E56">12 位 · 4.7kΩ 上拉</text>
+  <rect x="474" y="112" width="150" height="76" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="549" y="134" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#3C3489">ESP32 信息节点</text>
+  <text x="549" y="152" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#534AB7">UART2 · 115200</text>
+  <text x="549" y="170" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#534AB7">WiFi 云上报 · 共地</text>
+  <rect x="474" y="204" width="150" height="76" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="549" y="226" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#3C3489">ST-Link V2</text>
+  <text x="549" y="244" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#534AB7">SWD 下载调试</text>
+  <text x="549" y="262" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#534AB7">适配器速率 20 kHz</text>
+  <rect x="474" y="296" width="150" height="76" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text x="549" y="318" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#712B13">有源蜂鸣器</text>
+  <text x="549" y="336" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#993C1D">低电平响 · 空闲高</text>
+  <rect x="256" y="80" width="168" height="440" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+  <text x="340" y="470" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="500" fill="#0C447C">STM32F103C8T6</text>
+  <text x="340" y="488" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#185FA5">Cortex-M3 · 72 MHz</text>
+  <text x="340" y="504" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#185FA5">64K Flash · 20K SRAM</text>
+  <text x="262" y="132" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PB7</text>
+  <text x="262" y="148" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PB8</text>
+  <text x="262" y="164" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PB9</text>
+  <text x="262" y="224" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PB10</text>
+  <text x="262" y="240" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PB11</text>
+  <text x="262" y="316" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PA5</text>
+  <text x="262" y="332" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PA6</text>
+  <text x="262" y="408" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">PA8</text>
+  <text x="418" y="132" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">PA9 TX</text>
+  <text x="418" y="148" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">PA10 RX</text>
+  <text x="418" y="224" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">PA13</text>
+  <text x="418" y="240" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">PA14</text>
+  <text x="418" y="316" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#993C1D">PA12</text>
+  <line x1="206" y1="136" x2="256" y2="136" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="152" x2="256" y2="152" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="168" x2="256" y2="168" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="228" x2="256" y2="228" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="244" x2="256" y2="244" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="320" x2="256" y2="320" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="336" x2="256" y2="336" stroke="#888780" stroke-width="1"/>
+  <line x1="206" y1="412" x2="256" y2="412" stroke="#888780" stroke-width="1"/>
+  <line x1="424" y1="136" x2="468" y2="136" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="468" y1="152" x2="428" y2="152" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="424" y1="228" x2="468" y2="228" stroke="#888780" stroke-width="1"/>
+  <line x1="424" y1="244" x2="468" y2="244" stroke="#888780" stroke-width="1"/>
+  <line x1="424" y1="320" x2="468" y2="320" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+  <text x="210" y="132" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SCL</text>
+  <text x="210" y="148" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SDA</text>
+  <text x="210" y="164" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">INT</text>
+  <text x="210" y="224" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SCL</text>
+  <text x="210" y="240" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SDA</text>
+  <text x="210" y="316" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SCL</text>
+  <text x="210" y="332" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">SDA</text>
+  <text x="210" y="408" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#0F6E56">DQ</text>
+  <rect x="226" y="405" width="14" height="14" fill="#FFFFFF" stroke="#A32D2D" stroke-width="1"/>
+  <text x="233" y="398" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#A32D2D">4.7kΩ</text>
+  <text x="428" y="132" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">GPIO16</text>
+  <text x="428" y="148" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">GPIO17</text>
+  <text x="428" y="224" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">SWDIO</text>
+  <text x="428" y="240" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#534AB7">SWCLK</text>
+  <text x="428" y="316" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#993C1D">IN</text>
+  <rect x="40" y="565" width="150" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="115" y="587" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#633806">P1 电源输入</text>
+  <text x="115" y="605" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#854F0B">USB 5 V / 适配器</text>
+  <rect x="255" y="565" width="170" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="340" y="587" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#633806">U6 AMS1117-3.3</text>
+  <text x="340" y="605" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#854F0B">LDO 800 mA · 5V→3.3V</text>
+  <rect x="470" y="565" width="170" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="555" y="587" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#633806">3.3 V 电源域</text>
+  <text x="555" y="605" text-anchor="middle" font-family="system-ui,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="12" fill="#854F0B">MCU 与全部外设</text>
+  <line x1="194" y1="590" x2="249" y2="590" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="429" y1="590" x2="466" y2="590" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="222" y="582" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#854F0B">5 V</text>
+  <text x="447" y="582" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="11" fill="#854F0B">3.3 V</text>
+</svg>
