@@ -568,7 +568,7 @@ public class MainActivity extends Activity {
         String detail = "serial".equals(src) ? s.optString("port", "") : "wifi".equals(src) ? s.optString("host", "") : "";
         tvTitleSub.setText("上位机 · " + srcCn + (detail.isEmpty() ? "" : " " + detail));
 
-        // 网关可能已被别处（Web/命令行）切成别源，第一次拿到状态时对齐一下选中态
+        // 网关可能已被别处（命令行）切成别源，第一次拿到状态时对齐一下选中态
         if (!sourceSynced && !"none".equals(src)) {
             sourceSynced = true;
             if (!local.equals(source)) setSource(local, false);

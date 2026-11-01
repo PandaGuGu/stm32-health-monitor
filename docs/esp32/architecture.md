@@ -44,14 +44,12 @@ flowchart LR
         B4 --> B5["REST /api/*<br/>SSE /api/events"]
     end
 
-    subgraph UI["两端 UI"]
-        C1["Web 单页<br/>Canvas 曲线"]
+    subgraph UI["客户端"]
         C2["Android 原生<br/>1 Hz 轮询"]
     end
 
     A7 -- "115200 8N1" --> B1
     A6 -- "WiFi" --> B2
-    B5 --> C1
     B5 --> C2
 ```
 
@@ -69,7 +67,7 @@ flowchart LR
 
 | 方案 | 问题 |
 |---|---|
-| ESP32 直接托管 Web | 要把前端塞进 4 MB Flash；设备 IP 一变，App/书签全失效；串口场景完全不适用 |
+| ESP32 直接托管页面 | 要把前端塞进 4 MB Flash；设备 IP 一变，App/书签全失效；串口场景完全不适用 |
 | PC 网关 + 两端连网关 | 串口/WiFi 都能接；前端零改动适配设备；**没硬件也能用模拟器跑通** |
 
 代价是多一个进程。但 `server.py` 单文件、只依赖 pyserial，`python server.py` 就起来了，这个代价可以接受。
@@ -84,17 +82,16 @@ flowchart LR
 
 `MockSource` 不是"假页面"，而是**假设备**：它按同一份协议产生 `hello/telemetry/net/scan/ack`，
 甚至模拟 GPIO 状态、ADC 抖动、AP 丢包和 `reboot` 后的时间归零。
-所以 Web/App 里没有任何 `if (mock)` 分支 —— 插上真板子只换数据源，界面代码一行不改。
+所以 App 里没有任何 `if (mock)` 分支 —— 插上真板子只换数据源，界面代码一行不改。
 
 ### 3.5 直连模式：设备也能当"小网关"
 
-原本的取舍是"设备只吐 JSON，前端由 PC 网关托管"，因为 4 MB Flash 塞前端不划算。
+原本的取舍是"设备只吐 JSON，界面由 PC 侧承担"，因为 4 MB Flash 塞前端不划算。
 但**手机没有 PC 时就拿不到数据** —— 所以补了一条直连通道：设备自己提供与网关**同构**的
 `/api/status` + `POST /api/cmd`，App 把地址指向 `http://192.168.4.1` 即可，前端代码零改动。
 
 | | 走 PC 网关 | 直连设备 |
 |---|---|---|
-| 前端 | Web + App | App（Web 仍由 PC 托管） |
 | 数据源 | 串口 / WiFi / 模拟器可切 | 只有设备自己 |
 | 历史序列 | 120 点 | 60 点（设备环形缓冲） |
 | 原始流 | 有（网关缓存） | 无（设备不留日志内存） |
@@ -106,7 +103,7 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant U as Web / App
+    participant U as Android App
     participant G as 网关
     participant E as ESP32
 
@@ -157,7 +154,7 @@ GPIO16/17 已被 `uart_link` 占用，`gpio.set` / `gpio.mode` 对这两个脚�
 | `firmware/MAX30102/gcc/app/app_main.c` | 同上（GCC 变体，逻辑一致） |
 | `firmware/esp32/.../uart_link.*` | UART2 收行 → 极简 JSON 取值 → 合理性校验 → 进 `telemetry.vitals` |
 | 网关 `protocol.py` | `vitals` 从 telemetry 提到 snapshot 顶层，并把 `bpm/spo2` 并入 `series` |
-| Web / App | 「生理数据 · STM32」卡片：心率/血氧/体温/跌倒/帧龄/来源 + 心率曲线 |
+| Android App | 「生理数据 · STM32」卡片：心率/血氧/体温/跌倒/帧龄/来源 + 心率曲线 |
 | `host/tools/stm32_sim.py` | 无 STM32 时的替身：可走网关注入，也可走真串口喂 UART2 |
 
 三个实现细节：
@@ -175,7 +172,6 @@ GPIO16/17 已被 `uart_link` 占用，`gpio.set` / `gpio.mode` 对这两个脚�
 ```
 firmware/esp32/esp32_info_node/   固件（Arduino，8 个模块，零第三方库）
 host/gateway/                     protocol.py(协议/合并) sources.py(三源) server.py(HTTP+SSE)
-host/web/                         index.html + style.css + app.js（无构建）
 host/app/                         Android 原生 Java（MainActivity/Ui/SparkView/GatewayClient）
 docs/esp32/                       本文件 + protocol.md + debug.md + 截图
 scripts/build-esp32.ps1           编译/烧录
@@ -192,9 +188,8 @@ scripts/build-esp32.ps1           编译/烧录
 | 首帧 | 上电 500 ms 内 `net` + `hello` + `telemetry`；`hello` 自报的型号/rev/Flash/MAC 与 `esptool flash_id` 完全一致 |
 | 串口链路 | ✅ 真机：1 Hz 遥测连续、`gpio.set/get`、`adc.get`、`interval`、`scan`、`reboot` 全部返回配对 `ack` |
 | 命令回归 | ✅ 21 条全通（含 4 条 `vitals.*`）；`scan` 扫到 6 个真 AP（含 WPA3 / OPEN / 隐藏 SSID）；`reboot` 后 `reset=sw`、网关 `reconnects=0` |
-| Web 面板 | ✅ 真机数据渲染：型号/MAC/堆/温度/任务数、真 AP 列表、引脚点击 ack，**0 控制台报错** |
 | Android App | ✅ MuMu 上读到同一份真机数据（`20:50:0D:33:DA:D8`），引脚点击后网关侧核实 `gpio.12=1` |
-| **STM32 上行链路** | ✅ **协议与解析已打通**：`vitals.sim` 注入 → telemetry → 网关顶层 → Web/App 卡片；STM32 两侧代码编译通过（Keil 0 error 0 warning）。**真线未接**（见下） |
+| **STM32 上行链路** | ✅ **协议与解析已打通**：`vitals.sim` 注入 → telemetry → 网关顶层 → App 卡片；STM32 两侧代码编译通过（Keil 0 error 0 warning）。**真线未接**（见下） |
 | **WiFi 直连（AP）** | ✅ 真机：手机/MuMu 连 `esp32-info-DAD8`（`12345678`）→ App 直连 `192.168.4.1`，读到真身数据、`vitals` 实时、点引脚设备 `gpio.4=1`、扫描 8 个 AP（3.0 s 且客户端不掉线） |
 | WiFi STA（连路由器） | ⏳ `wifi.sta` 已实现但未配网验证 |
 | 热插拔 | ⏳ 网关 3 s 重连逻辑未做真机拔插验证 |
@@ -214,10 +209,9 @@ scripts/build-esp32.ps1           编译/烧录
 
 - [x] 协议定版（`protocol.md` v1）与三种数据源同构
 - [x] 固件四类信息采集 + 21 条命令 + 设备侧 HTTP
-- [x] Web 面板（连接/卡片/曲线/扫描/命令台/原始流）
 - [x] Android App（双列自适应、引脚可点、命令台）+ MuMu 实测
 - [x] **真机串口链路**：`hello` 首帧、`gpio.set` 生效、`scan`/`reboot` 全部实测通过
-- [x] **STM32 上行链路（协议与解析）**：`vitals.sim` → telemetry → 网关 → Web/App 全通；STM32 侧 `vitals_emit()` 编译通过
+- [x] **STM32 上行链路（协议与解析）**：`vitals.sim` → telemetry → 网关 → App 全通；STM32 侧 `vitals_emit()` 编译通过
 - [ ] **接真 STM32 验线**：PA9→GPIO16、共地，确认 `vitals.src=stm32`、`age_ms` 稳定、丢帧率
 - [x] **WiFi 直连（AP）**：手机/模拟器连热点 → App 直连 `192.168.4.1` 全通（含扫描与反向控制）
 - [ ] **WiFi STA 复验**：`wifi.sta` 配网 → 网关切 `--source wifi --wifi <设备IP>`

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """ESP32 信息节点 · 上位机网关
 
-一个进程同时提供：
-  · 静态 Web 面板      GET  /                （host/web 下的单页应用）
+一个进程提供：
   · REST 快照          GET  /api/snapshot
   · 命令下发           POST /api/cmd         {"cmd": "gpio.set 2 1"}
   · 数据源切换         POST /api/connect     {"source": "serial|wifi|mock", ...}
@@ -20,12 +19,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import mimetypes
 import os
 import sys
 import threading
 import time
-import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
@@ -41,7 +38,6 @@ from sources import (                              # noqa: E402
     list_serial_ports,
 )
 
-WEB_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web"))
 VERSION = "0.1.0"
 
 
@@ -100,7 +96,6 @@ class App:
         seg = self.snap.read()
         seg["gateway"] = {
             "version": VERSION,
-            "web_dir": WEB_DIR,
             "source": self.src.name if self.src else "none",
             "source_info": self.src.info() if self.src else {},
         }
@@ -172,7 +167,9 @@ class Handler(BaseHTTPRequestHandler):
             cmd = (qs.get("cmd") or [""])[0]
             self._json(APP.command(cmd))
         else:
-            self._static(path)
+            # 不托管任何静态资源：数据以 JSON 形式暴露给 App 或命令行
+            self._json({"ok": False, "error": f"not found: {path}",
+                        "hint": "快照见 /api/snapshot，实时流见 /api/events"}, 404)
 
     # ---------- POST ----------
     def do_POST(self) -> None:                                  # noqa: N802
@@ -232,33 +229,6 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
             return
 
-    # ---------- 静态文件 ----------
-    def _static(self, path: str) -> None:
-        if path in ("/", ""):
-            path = "/index.html"
-        rel = os.path.normpath(path.lstrip("/")).replace("\\", "/")
-        if rel.startswith("..") or os.path.isabs(rel):
-            self._json({"ok": False, "error": "bad path"}, 400)
-            return
-        full = os.path.join(WEB_DIR, rel)
-        if not os.path.isfile(full):
-            self._json({"ok": False, "error": f"not found: {path}"}, 404)
-            return
-        ctype, _ = mimetypes.guess_type(full)
-        ctype = ctype or "application/octet-stream"
-        if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
-            ctype += "; charset=utf-8"
-        with open(full, "rb") as f:
-            data = f.read()
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-cache")
-        self._cors()
-        self.end_headers()
-        self.wfile.write(data)
-
-
 def auto_source() -> Tuple[str, Dict[str, Any]]:
     ports = list_serial_ports()
     for p in ports:
@@ -276,11 +246,7 @@ def main() -> int:
     ap.add_argument("--serial", dest="serial_port", default="", help="串口号，如 COM3")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--wifi", dest="wifi_host", default="", help="ESP32 的 IP 或 host:port")
-    ap.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
     args = ap.parse_args()
-
-    if not os.path.isdir(WEB_DIR):
-        print(f"[!] 找不到前端目录：{WEB_DIR}", file=sys.stderr)
 
     source, kw = args.source, {}
     if args.source == "auto":
@@ -299,14 +265,10 @@ def main() -> int:
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
-    url = f"http://127.0.0.1:{args.port}/"
-    print(f"[+] 上位机已启动：{url}")
-    print(f"    Web  : {url}")
-    print(f"    手机/模拟器: http://<本机局域网IP>:{args.port}/   （MuMu 用 http://10.0.2.2:{args.port}/）")
-    print(f"    Web 目录: {WEB_DIR}")
+    print(f"[+] 网关已启动：http://127.0.0.1:{args.port}/api/snapshot")
+    print(f"    手机/模拟器: http://<本机局域网IP>:{args.port}/api/snapshot"
+          f"   （MuMu 用 http://10.0.2.2:{args.port}/api/snapshot）")
     print("    Ctrl+C 退出")
-    if not args.no_open:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -217,7 +217,7 @@ $ curl "http://192.168.1.66/api/cmd?cmd=gpio.set%202%201&id=13"
 - 没有 `raw` 原始流（设备不为每条日志留内存）
 - `stats.acks` 恒为 0（设备不记录 ack 次数），`stats.errors` 是 vitals 坏帧数
 
-> 设备侧**不跑 Web 前端**：Web/App 由 PC 网关统一提供，避免在 4 MB Flash 里塞前端资源，也避免设备 IP 变化导致前端要跟着改地址。
+> 设备侧**不跑前端**：界面由 Android App 承担，避免在 4 MB Flash 里塞前端资源，也避免设备 IP 变化导致客户端要跟着改地址。
 
 ## 7. 上位机侧合并规则（`host/gateway`）
 
@@ -240,7 +240,7 @@ $ curl "http://192.168.1.66/api/cmd?cmd=gpio.set%202%201&id=13"
 ```
 
 - `series` 保留最近 **120** 个遥测点，供前端画趋势；`vitals.ok` 为真时同时记录 `bpm`/`spo2`
-- `vitals` 从 `telemetry` 里**提到顶层**，Web/App 不必再往下钻
+- `vitals` 从 `telemetry` 里**提到顶层**，App 不必再往下钻
 - 断线时 `connected=false`，但保留最后一次 snapshot（前端展示「最后已知值」并置灰）
 - `source=mock` 时全部字段由内置模拟器生成，接口与真机**完全一致**，用于无硬件开发
 

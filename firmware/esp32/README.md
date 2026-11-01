@@ -1,7 +1,7 @@
 # ESP32 信息节点（firmware/esp32）
 
 ESP32-WROOM-32 上的**信息采集固件**，只干三件事：采集、上报、听命令。不掺业务判定，
-方便上位机（`host/gateway` + `host/web` + `host/app`）单独调试。
+方便上位机（`host/gateway` + `host/app`）单独调试。
 
 - 协议：**JSON Lines 上行 / 文本命令下行**，详见 [docs/esp32/protocol.md](../../docs/esp32/protocol.md)
 - 数据源可切：串口（USB 转串口）或 WiFi（设备自带 HTTP `/api/*`）
