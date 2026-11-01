@@ -1,6 +1,8 @@
 # 接线与原理图
 
-> 组件清单图见 [组件部分.png](./组件部分.png)。本文件给出逐引脚接线表与系统级 Mermaid 原理图。
+> 组件清单图见 [组件部分.png](./组件部分.png)；精修系统原理图见
+> [docs/schematic/系统原理图_v1.1.svg](../docs/schematic/系统原理图_v1.1.svg)（[引脚分配表](../docs/schematic/系统原理图_v1.1.md)）。
+> 本文件给出逐引脚接线表与一张供快速对照的 Mermaid 图。
 
 ## 1. 接线表
 
@@ -27,10 +29,15 @@
 | **蜂鸣器**（有源） | VCC | 3.3V | |
 | | GND | GND | |
 | | I/O | PA12 | GPIO 高电平驱动 |
+| **ESP32-WROOM-32** 信息节点 | VIN | 5V 或 3.3V | 板载 AMS1117，按模块实际标注接 |
+| | GND | GND | 与 STM32 共地，串口通信的必要条件 |
+| | GPIO16 (RX2) | ← PA9 | STM32 `USART1_TX` |
+| | GPIO17 (TX2) | → PA10 | STM32 `USART1_RX` |
 
 > **注意**：`PA12` 同时是 USB_DP。作 GPIO 使用后蓝板 USB 口不再用于 USB 通信（烧录用 SWD/JLINK 即可）。
+> ESP32 只接三根线（TX / RX / GND），不共地时串口收到的全是乱码。
 
-## 2. 系统原理图（Mermaid）
+## 2. 系统连线（Mermaid）
 
 ```mermaid
 flowchart LR
@@ -45,17 +52,22 @@ flowchart LR
     subgraph MCU["STM32F103C8T6 蓝板"]
         I2C2["硬件 I2C2"]
         SWI["软件 I2C"]
-        OW["单总线 1-Wire"]
+        OW["1-Wire"]
         GPIO["GPIO"]
         POLL["INT 轮询"]
+        U1["USART1<br/>PA9 / PA10"]
     end
+
+    ESP["ESP32-WROOM-32<br/>信息节点"]
 
     HR -- "SCL=PB7 / SDA=PB8" --> SWI
     HR -- "INT=PB9" --> POLL
     IMU -- "SCL=PB10 / SDA=PB11" --> I2C2
-    TEMP -- "DQ=PA8" --> OW
+    TEMP -- "DQ=PA8 + 4.7k 上拉" --> OW
     LCD -- "SCK=PA5 / SDA=PA6" --> SWI
     BUZ -- "I/O=PA12" --> GPIO
+    U1 -- "TX/RX 115200<br/>GPIO16 / GPIO17" --> ESP
+    ESP -- "BLE · WiFi · HTTP" --> NET(["App / 中继"])
 ```
 
 ## 3. 电源与信号完整性
